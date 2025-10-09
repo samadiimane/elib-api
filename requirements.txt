@@ -1,3 +1,14 @@
 fastapi~=0.115
-uvicorn[standard]~=0.30
+
+# On Windows we keep plain uvicorn to avoid Rust/watchfiles
+uvicorn~=0.30 ; sys_platform == "win32"
+# On Linux (your Docker/server) we use the richer “standard” extra
+uvicorn[standard]~=0.30 ; sys_platform != "win32"
+
 pydantic~=2.8
+SQLAlchemy~=2.0
+alembic~=1.13
+pydantic-settings~=2.4
+
+# Postgres driver only on Linux (Docker/server), not on Windows
+psycopg2-binary~=2.9 ; sys_platform != "win32"
