@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict
 
 from app.models.document import DocumentType
+
+
+class PrimaryCategoryRef(BaseModel):
+    """Slim representation of a document's primary category."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    name: str
 
 
 class DocumentOut(BaseModel):
@@ -22,8 +30,7 @@ class DocumentOut(BaseModel):
     doi: str | None
     isbn: str | None
     issn: str | None
-    primary_category_id: int | None
-    created_at: datetime
+    primary_category: PrimaryCategoryRef | None
 
 
-__all__ = ["DocumentOut"]
+__all__ = ["DocumentOut", "PrimaryCategoryRef"]

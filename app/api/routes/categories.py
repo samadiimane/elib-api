@@ -3,12 +3,15 @@ from __future__ import annotations
 from typing import Generator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
 from sqlalchemy.orm import Session
+from sqlalchemy import asc, desc
 
 from app.db.session import SessionLocal
 from app.models.category import Category, CategoryKind
-from app.schemas.category import CategoryOut
+from app.repositories.categories import CategoryRepository
+from app.schemas.category import CategoryCounts, CategoryDetailOut, CategoryOut
+from app.schemas.pagination import PaginatedResponse
+from app.services.search import resolve_sort_key
 
 router = APIRouter(prefix="/v1/categories", tags=["categories"])
 
@@ -21,27 +24,62 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-@router.get("", response_model=list[CategoryOut])
+CATEGORY_SORTS = {
+    "name asc": asc(Category.name),
+    "name desc": desc(Category.name),
+}
+
+
+@router.get("", response_model=PaginatedResponse[CategoryOut])
 def list_categories(
     kind: CategoryKind | None = Query(default=None),
-    parent_id: int | None = Query(default=None, ge=1),
+    parent_slug: str | None = Query(default=None, min_length=1),
+    search: str | None = Query(default=None, min_length=1),
+    sort: str | None = Query(default="name asc"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-) -> list[CategoryOut]:
-    stmt = select(Category).order_by(Category.name)
-    if kind is not None:
-        stmt = stmt.where(Category.kind == kind)
-    if parent_id is not None:
-        stmt = stmt.where(Category.parent_id == parent_id)
-    result = db.execute(stmt)
-    return result.scalars().all()
+) -> PaginatedResponse[CategoryOut]:
+    repository = CategoryRepository(db)
+    try:
+        order_by = resolve_sort_key(sort, allowed=CATEGORY_SORTS, default="name asc")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    offset = (page - 1) * page_size
+    categories, total = repository.list(
+        kind=kind,
+        parent_slug=parent_slug,
+        search=search,
+        order_by=order_by,
+        offset=offset,
+        limit=page_size,
+    )
+
+    items = [CategoryOut.model_validate(cat) for cat in categories]
+    has_next = offset + len(items) < total
+
+    return PaginatedResponse[CategoryOut](
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=has_next,
+    )
 
 
-@router.get("/{category_id}", response_model=CategoryOut)
+@router.get("/{slug}", response_model=CategoryDetailOut)
 def get_category(
-    category_id: int,
+    slug: str,
     db: Session = Depends(get_db),
-) -> CategoryOut:
-    category = db.get(Category, category_id)
+) -> CategoryDetailOut:
+    repository = CategoryRepository(db)
+    category = repository.get_by_slug(slug)
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
-    return category
+
+    counts = CategoryCounts(documents=repository.count_documents_for_category(category.id))
+    return CategoryDetailOut(
+        category=CategoryOut.model_validate(category),
+        counts=counts,
+    )
