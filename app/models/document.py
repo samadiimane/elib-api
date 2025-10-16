@@ -1,22 +1,18 @@
 from __future__ import annotations
-
 import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum as SAEnum
-from sqlalchemy import ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
-if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+if TYPE_CHECKING:
     from app.models.category import Category
 
 
 class DocumentType(str, enum.Enum):
-    """Enumerated document artifact types."""
-
     book = "book"
     article = "article"
     thesis = "thesis"
@@ -28,8 +24,6 @@ class DocumentType(str, enum.Enum):
 
 
 class Document(Base):
-    """Canonical document entry available to end users."""
-
     __tablename__ = "documents"
     __table_args__ = (
         Index("ix_documents_type", "type"),
@@ -40,8 +34,9 @@ class Document(Base):
     title: Mapped[str] = mapped_column(String(500), nullable=False)
     abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # IMPORTANT: no DB enum; use VARCHAR + CHECK
     type: Mapped[DocumentType] = mapped_column(
-        SAEnum(DocumentType, name="doc_type"),
+        SAEnum(DocumentType, name="doc_type", native_enum=False),
         nullable=False,
     )
     lang: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -58,15 +53,10 @@ class Document(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     primary_category: Mapped["Category | None"] = relationship(

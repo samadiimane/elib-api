@@ -1,21 +1,17 @@
 from __future__ import annotations
-
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, Index, String, Text
+from sqlalchemy import Enum as SAEnum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
-if TYPE_CHECKING:  # pragma: no cover - typing helpers only
+if TYPE_CHECKING:
     from app.models.document import Document
 
 
 class CategoryKind(str, enum.Enum):
-    """Supported navigation grouping kinds."""
-
     section = "section"
     journal = "journal"
     archive_collection = "archive_collection"
@@ -23,8 +19,6 @@ class CategoryKind(str, enum.Enum):
 
 
 class Category(Base):
-    """Hierarchical navigation entry."""
-
     __tablename__ = "categories"
     __table_args__ = (
         Index("ix_categories_kind", "kind"),
@@ -36,8 +30,9 @@ class Category(Base):
         ForeignKey("categories.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # IMPORTANT: no DB enum; use VARCHAR + CHECK
     kind: Mapped[CategoryKind] = mapped_column(
-        SAEnum(CategoryKind, name="category_kind"),
+        SAEnum(CategoryKind, name="category_kind", native_enum=False),
         nullable=False,
     )
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
