@@ -8,10 +8,14 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.models.document import Document, DocumentType
-from app.repositories.documents import DocumentRepository
+from app.repositories.documents import (
+    DocumentRepository,
+    build_base_filters,
+    list_documents as list_documents_query,
+)
 from app.schemas.document import DocumentOut
 from app.schemas.pagination import PaginatedResponse
-from app.services.search import resolve_sort_key
+from app.services.search import validate_sort
 
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
 
@@ -27,10 +31,16 @@ def get_db() -> Generator[Session, None, None]:
 DOCUMENT_SORTS = {
     "created_at desc": desc(Document.created_at),
     "created_at asc": asc(Document.created_at),
+    "created_desc": desc(Document.created_at),
+    "created_asc": asc(Document.created_at),
     "year desc": desc(Document.year),
     "year asc": asc(Document.year),
+    "year_desc": desc(Document.year),
+    "year_asc": asc(Document.year),
     "title asc": asc(Document.title),
     "title desc": desc(Document.title),
+    "title_asc": asc(Document.title),
+    "title_desc": desc(Document.title),
 }
 
 
@@ -50,28 +60,30 @@ def list_documents(
     if year_min is not None and year_max is not None and year_min > year_max:
         raise HTTPException(status_code=422, detail="year_min cannot be greater than year_max")
 
-    repository = DocumentRepository(db)
-
     try:
-        order_by = resolve_sort_key(sort, allowed=DOCUMENT_SORTS, default="created_at desc")
+        order_by = validate_sort(sort, allowed=DOCUMENT_SORTS, default="created_at desc")
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    offset = (page - 1) * page_size
-    documents, total = repository.list(
+    base_query = build_base_filters(
+        db,
         q=q,
         type_=type_,
         lang=lang,
-        year_min=year_min,
-        year_max=year_max,
+        year_from=year_min,
+        year_to=year_max,
         category_slug=category_slug,
-        order_by=order_by,
-        offset=offset,
-        limit=page_size,
+    )
+    documents, total = list_documents_query(
+        db,
+        base_query,
+        sort_clause=order_by,
+        page=page,
+        page_size=page_size,
     )
 
     items = [DocumentOut.model_validate(doc) for doc in documents]
-    has_next = offset + len(items) < total
+    has_next = (page - 1) * page_size + len(items) < total
 
     return PaginatedResponse[DocumentOut](
         items=items,

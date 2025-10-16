@@ -11,7 +11,7 @@ from app.models.category import Category, CategoryKind
 from app.repositories.categories import CategoryRepository
 from app.schemas.category import CategoryCounts, CategoryDetailOut, CategoryOut
 from app.schemas.pagination import PaginatedResponse
-from app.services.search import resolve_sort_key
+from app.services.search import validate_sort
 
 router = APIRouter(prefix="/v1/categories", tags=["categories"])
 
@@ -42,7 +42,7 @@ def list_categories(
 ) -> PaginatedResponse[CategoryOut]:
     repository = CategoryRepository(db)
     try:
-        order_by = resolve_sort_key(sort, allowed=CATEGORY_SORTS, default="name asc")
+        order_by = validate_sort(sort, allowed=CATEGORY_SORTS, default="name asc")
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
