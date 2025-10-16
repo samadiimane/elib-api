@@ -32,22 +32,6 @@ DOCUMENT_TYPE_ENUM = sa.Enum(
     create_type=False, 
 )
 
-op.execute("""
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'category_kind') THEN
-    CREATE TYPE category_kind AS ENUM ('section','journal','archive_collection','topic');
-  END IF;
-END $$;
-""")
-
-op.execute("""
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'doc_type') THEN
-    CREATE TYPE doc_type AS ENUM ('book','article','thesis','report','manuscript','archive_item','site_record','other');
-  END IF;
-END $$;
-""")
-
 def upgrade() -> None:
     """Upgrade schema with canonical categories/documents."""
     bind = op.get_bind()
@@ -56,6 +40,21 @@ def upgrade() -> None:
     if inspector.has_table("documents") and not inspector.has_table("legacy_documents"):
         op.rename_table("documents", "legacy_documents")
 
+    op.execute("""
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'category_kind') THEN
+    CREATE TYPE category_kind AS ENUM ('section','journal','archive_collection','topic');
+  END IF;
+END $$;
+""")
+
+    op.execute("""
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'doc_type') THEN
+    CREATE TYPE doc_type AS ENUM ('book','article','thesis','report','manuscript','archive_item','site_record','other');
+  END IF;
+END $$;
+""")
     op.create_table(
         "categories",
         sa.Column("id", sa.Integer(), nullable=False),
