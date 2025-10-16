@@ -19,16 +19,8 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-CATEGORY_KIND_ENUM = sa.Enum(
-    "section",
-    "journal",
-    "archive_collection",
-    "topic",
-    name="category_kind",
-    create_type=False,
-)
-
-DOCUMENT_TYPE_ENUM = sa.Enum(
+ENUM_VALUES_CATEGORY = ("section", "journal", "archive_collection", "topic")
+ENUM_VALUES_DOCUMENT = (
     "book",
     "article",
     "thesis",
@@ -37,26 +29,60 @@ DOCUMENT_TYPE_ENUM = sa.Enum(
     "archive_item",
     "site_record",
     "other",
-    name="doc_type",
-    create_type=False,
 )
+
+
+def _enum_types(bind):
+    if bind.dialect.name == "postgresql":
+        category_enum = sa.Enum(
+            *ENUM_VALUES_CATEGORY,
+            name="category_kind",
+            create_type=False,
+        )
+        document_enum = sa.Enum(
+            *ENUM_VALUES_DOCUMENT,
+            name="doc_type",
+            create_type=False,
+        )
+    else:
+        category_enum = sa.Enum(
+            *ENUM_VALUES_CATEGORY,
+            name="category_kind",
+            native_enum=False,
+        )
+        document_enum = sa.Enum(
+            *ENUM_VALUES_DOCUMENT,
+            name="doc_type",
+            native_enum=False,
+        )
+    return category_enum, document_enum
+
 
 def upgrade() -> None:
     """Upgrade schema with canonical categories/documents."""
     bind = op.get_bind()
     inspector = inspect(bind)
 
+    category_enum, document_enum = _enum_types(bind)
+
+    if bind.dialect.name == "postgresql":
+        op.execute(
+            "CREATE TYPE IF NOT EXISTS category_kind "
+            "AS ENUM ('section','journal','archive_collection','topic');"
+        )
+        op.execute(
+            "CREATE TYPE IF NOT EXISTS doc_type "
+            "AS ENUM ('book','article','thesis','report','manuscript','archive_item','site_record','other');"
+        )
+
     if inspector.has_table("documents") and not inspector.has_table("legacy_documents"):
         op.rename_table("documents", "legacy_documents")
 
-    if bind.dialect.name == "postgresql":
-        CATEGORY_KIND_ENUM.create(bind, checkfirst=True)
-        DOCUMENT_TYPE_ENUM.create(bind, checkfirst=True)
     op.create_table(
         "categories",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("parent_id", sa.Integer(), nullable=True),
-        sa.Column("kind", CATEGORY_KIND_ENUM, nullable=False),
+        sa.Column("kind", category_enum, nullable=False),
         sa.Column("slug", sa.String(length=100), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
@@ -81,7 +107,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("title", sa.String(length=500), nullable=False),
         sa.Column("abstract", sa.Text(), nullable=True),
-        sa.Column("type", DOCUMENT_TYPE_ENUM, nullable=False),
+        sa.Column("type", document_enum, nullable=False),
         sa.Column("lang", sa.String(length=10), nullable=False),
         sa.Column("year", sa.Integer(), nullable=True),
         sa.Column("pages", sa.Integer(), nullable=True),
@@ -130,5 +156,5 @@ def downgrade() -> None:
         op.rename_table("legacy_documents", "documents")
 
     if bind.dialect.name == "postgresql":
-        DOCUMENT_TYPE_ENUM.drop(bind, checkfirst=True)
-        CATEGORY_KIND_ENUM.drop(bind, checkfirst=True)
+        op.execute("DROP TYPE IF EXISTS doc_type;")
+        op.execute("DROP TYPE IF EXISTS category_kind;")
