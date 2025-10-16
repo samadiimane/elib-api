@@ -20,16 +20,25 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 CATEGORY_KIND_ENUM = sa.Enum(
-    "section", "journal", "archive_collection", "topic",
+    "section",
+    "journal",
+    "archive_collection",
+    "topic",
     name="category_kind",
-    create_type=False, 
+    create_type=False,
 )
 
 DOCUMENT_TYPE_ENUM = sa.Enum(
-    "book", "article", "thesis", "report", "manuscript",
-    "archive_item", "site_record", "other",
+    "book",
+    "article",
+    "thesis",
+    "report",
+    "manuscript",
+    "archive_item",
+    "site_record",
+    "other",
     name="doc_type",
-    create_type=False, 
+    create_type=False,
 )
 
 def upgrade() -> None:
@@ -40,21 +49,9 @@ def upgrade() -> None:
     if inspector.has_table("documents") and not inspector.has_table("legacy_documents"):
         op.rename_table("documents", "legacy_documents")
 
-    op.execute("""
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'category_kind') THEN
-    CREATE TYPE category_kind AS ENUM ('section','journal','archive_collection','topic');
-  END IF;
-END $$;
-""")
-
-    op.execute("""
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'doc_type') THEN
-    CREATE TYPE doc_type AS ENUM ('book','article','thesis','report','manuscript','archive_item','site_record','other');
-  END IF;
-END $$;
-""")
+    if bind.dialect.name == "postgresql":
+        CATEGORY_KIND_ENUM.create(bind, checkfirst=True)
+        DOCUMENT_TYPE_ENUM.create(bind, checkfirst=True)
     op.create_table(
         "categories",
         sa.Column("id", sa.Integer(), nullable=False),
@@ -132,6 +129,6 @@ def downgrade() -> None:
     if inspector.has_table("legacy_documents") and not inspector.has_table("documents"):
         op.rename_table("legacy_documents", "documents")
 
-    op.execute("DROP TYPE IF EXISTS doc_type;")
-    op.execute("DROP TYPE IF EXISTS category_kind;")
-
+    if bind.dialect.name == "postgresql":
+        DOCUMENT_TYPE_ENUM.drop(bind, checkfirst=True)
+        CATEGORY_KIND_ENUM.drop(bind, checkfirst=True)
