@@ -5,7 +5,7 @@ from app.core.config import settings
 
 # Engine: low-level connection (PDO-like)
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.database_url,
     future=True,
     pool_pre_ping=True
 )
