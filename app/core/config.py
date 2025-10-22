@@ -13,6 +13,15 @@ class Settings(BaseSettings):
         alias="CORS_ORIGINS",
     )
 
+    # storage
+    storage_endpoint: str = Field(default="http://127.0.0.1:9000", alias="STORAGE_ENDPOINT")
+    storage_bucket: str = Field(default="documents", alias="STORAGE_BUCKET")
+    storage_access_key: str = Field(default="minio", alias="STORAGE_ACCESS_KEY")
+    storage_secret_key: str = Field(default="minio12345", alias="STORAGE_SECRET_KEY")
+    storage_region: str = Field(default="us-east-1", alias="STORAGE_REGION")
+    # Optional: if i ever want to build absolute public URLs (we’ll use presigned instead)
+    storage_cdn_base: str | None = Field(default=None, alias="STORAGE_CDN_BASE")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors(cls, v):

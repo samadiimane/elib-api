@@ -12,3 +12,6 @@ pydantic-settings~=2.4
 
 # Postgres driver only on Linux (Docker/server), not on Windows
 psycopg2-binary~=2.9 ; sys_platform != "win32"
+
+boto3~=1.34
+
