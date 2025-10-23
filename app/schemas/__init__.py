@@ -12,6 +12,9 @@ from app.schemas.search import (
     SearchFacets,
 )
 
+from app.schemas.journal import JournalOut, JournalCounts, JournalDetailOut, JournalIssueOut
+
+
 __all__ = [
     "CategoryCounts",
     "CategoryDetailOut",
@@ -25,4 +28,8 @@ __all__ = [
     "FacetYearBucket",
     "SearchDocumentsResponse",
     "SearchFacets",
+    "JournalOut",
+    "JournalCounts",
+    "JournalDetailOut",
+    "JournalIssueOut",
 ]

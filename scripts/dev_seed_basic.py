@@ -1,12 +1,15 @@
 """Development helper to seed baseline taxonomy and sample documents."""
+# scripts/dev_seed_basic.py
 
 from __future__ import annotations
 
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.models.category import Category, CategoryKind
-from app.models.document import Document, DocumentType
+from app.models import Category, CategoryKind, Document, DocumentType, Journal, JournalIssue
+from sqlalchemy.orm import configure_mappers
+configure_mappers()
+
 
 
 def get_or_create_category(

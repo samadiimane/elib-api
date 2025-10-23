@@ -8,6 +8,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
+
 if TYPE_CHECKING:
     from app.models.category import Category
 
@@ -46,6 +49,14 @@ class Document(Base):
     doi: Mapped[str | None] = mapped_column(String(100), nullable=True)
     isbn: Mapped[str | None] = mapped_column(String(50), nullable=True)
     issn: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    journal_id: Mapped[int | None] = mapped_column(ForeignKey("journals.id", ondelete="SET NULL"))
+    issue_id:   Mapped[int | None] = mapped_column(ForeignKey("journal_issues.id", ondelete="SET NULL"))
+    start_page: Mapped[int | None] = mapped_column(Integer)
+    end_page:   Mapped[int | None] = mapped_column(Integer)
+
+    journal = relationship("Journal", back_populates="documents")
+    issue   = relationship("JournalIssue", back_populates="documents")
 
     primary_category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"),

@@ -1,4 +1,5 @@
 """Development helper script to seed baseline navigation categories."""
+# scripts/dev_seed_categories.py
 
 from __future__ import annotations
 
@@ -7,7 +8,10 @@ from typing import Iterable
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.models.category import Category, CategoryKind
+from app.models import Category, CategoryKind, Document, DocumentType, Journal, JournalIssue
+from sqlalchemy.orm import configure_mappers
+configure_mappers()
+
 
 SeedNode = dict[str, object]
 
