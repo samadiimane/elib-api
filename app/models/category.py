@@ -9,6 +9,7 @@ from app.db.session import Base
 
 if TYPE_CHECKING:
     from app.models.document import Document
+    from app.models.journal import Journal
 
 
 class CategoryKind(str, enum.Enum):
@@ -28,6 +29,10 @@ class Category(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    journal_id: Mapped[int | None] = mapped_column(
+        ForeignKey("journals.id", ondelete="SET NULL"),
         nullable=True,
     )
     # IMPORTANT: no DB enum; use VARCHAR + CHECK
@@ -52,6 +57,7 @@ class Category(Base):
         "Document",
         back_populates="primary_category",
     )
+    journal: Mapped["Journal | None"] = relationship("Journal", back_populates="categories")
 
 
 __all__ = ["Category", "CategoryKind"]

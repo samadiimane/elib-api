@@ -1,134 +1,130 @@
-"""Development helper to seed baseline taxonomy and sample documents."""
-# scripts/dev_seed_basic.py
+"""Seed foundational documents that complement the journal corpus."""
 
 from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Iterable
 
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.models import Category, CategoryKind, Document, DocumentType, Journal, JournalIssue
+from app.models import Category, Document, DocumentType
 from sqlalchemy.orm import configure_mappers
+
 configure_mappers()
 
 
+@dataclass(frozen=True)
+class DocumentSeed:
+    title: str
+    abstract: str
+    type: DocumentType
+    lang: str
+    year: int
+    pages: int | None
+    category_slug: str | None
+    doi: str | None = None
+    isbn: str | None = None
+    issn: str | None = None
 
-def get_or_create_category(
-    session,
-    *,
-    slug: str,
-    name: str,
-    kind: CategoryKind,
-    parent: Category | None = None,
-) -> Category:
+
+DOCUMENT_SEEDS: tuple[DocumentSeed, ...] = (
+    DocumentSeed(
+        title="Atlas of Saharan Caravanserais",
+        abstract="Synthesizes architectural surveys and caravan diaries to map Saharan waystations between Tindouf and Zagora.",
+        type=DocumentType.report,
+        lang="en",
+        year=2018,
+        pages=142,
+        category_slug="heritage-sites",
+        doi="10.3479/msr.2018.001",
+    ),
+    DocumentSeed(
+        title="Catalogue of Idrisi Manuscripts at al-Qarawiyyin",
+        abstract="Annotated catalogue describing codicological features of Idrisi lineage manuscripts preserved in Fes.",
+        type=DocumentType.archive_item,
+        lang="ar",
+        year=2021,
+        pages=312,
+        category_slug="manuscript-guides",
+        isbn="978-1-55555-482-3",
+    ),
+    DocumentSeed(
+        title="Digitizing the Bilateral Protectorate Archives",
+        abstract="Evaluates digitization workflows harmonizing Spanish and French archival metadata for shared holdings.",
+        type=DocumentType.thesis,
+        lang="fr",
+        year=2019,
+        pages=198,
+        category_slug="digitization-projects",
+    ),
+    DocumentSeed(
+        title="Crafting Brass Astrolabes in Seventeenth-Century Fes",
+        abstract="Explores artisanal treatises and workshop inventories to contextualize scientific instruments within Maghribi craft guilds.",
+        type=DocumentType.article,
+        lang="en",
+        year=2022,
+        pages=27,
+        category_slug="material-culture",
+    ),
+    DocumentSeed(
+        title="Pilgrimage Networks of the Jbala Highlands",
+        abstract="Oral narratives and ethnographic mapping illustrate seasonal pilgrimages linking shrine-based economies.",
+        type=DocumentType.report,
+        lang="ar",
+        year=2017,
+        pages=96,
+        category_slug="sacred-architecture",
+    ),
+)
+
+
+def get_category(session, slug: str | None) -> Category | None:
+    if slug is None:
+        return None
     stmt = select(Category).where(Category.slug == slug)
-    instance = session.execute(stmt).scalar_one_or_none()
-    if instance:
-        return instance
-
-    category = Category(slug=slug, name=name, kind=kind, parent=parent)
-    session.add(category)
-    session.flush()
-    return category
+    return session.execute(stmt).scalar_one_or_none()
 
 
-def get_or_create_document(session, *, title: str, defaults: dict) -> Document:
-    stmt = select(Document).where(Document.title == title)
-    instance = session.execute(stmt).scalar_one_or_none()
-    if instance:
-        return instance
+def upsert_document(session, seed: DocumentSeed) -> None:
+    stmt = select(Document).where(Document.title == seed.title)
+    document = session.execute(stmt).scalar_one_or_none()
+    category = get_category(session, seed.category_slug)
 
-    document = Document(title=title, **defaults)
+    if document:
+        document.abstract = seed.abstract
+        document.type = seed.type
+        document.lang = seed.lang
+        document.year = seed.year
+        document.pages = seed.pages
+        document.primary_category = category
+        document.doi = seed.doi
+        document.isbn = seed.isbn
+        document.issn = seed.issn
+        return
+
+    document = Document(
+        title=seed.title,
+        abstract=seed.abstract,
+        type=seed.type,
+        lang=seed.lang,
+        year=seed.year,
+        pages=seed.pages,
+        primary_category=category,
+        doi=seed.doi,
+        isbn=seed.isbn,
+        issn=seed.issn,
+    )
     session.add(document)
-    session.flush()
-    return document
 
 
-def main() -> None:
+def run(seeds: Iterable[DocumentSeed] = DOCUMENT_SEEDS) -> None:
     session = SessionLocal()
     try:
-        # Root sections
-        library = get_or_create_category(
-            session,
-            slug="library",
-            name="Library",
-            kind=CategoryKind.section,
-        )
-        journals = get_or_create_category(
-            session,
-            slug="journals",
-            name="Journals",
-            kind=CategoryKind.section,
-        )
-        archives = get_or_create_category(
-            session,
-            slug="archives",
-            name="Archives & Documentary Heritage",
-            kind=CategoryKind.section,
-        )
-        sites = get_or_create_category(
-            session,
-            slug="sites",
-            name="Historical Sites & Landmarks",
-            kind=CategoryKind.section,
-        )
-        issues = get_or_create_category(
-            session,
-            slug="issues",
-            name="Research Issues & Problematics",
-            kind=CategoryKind.section,
-        )
-
-        # Sample journal under journals
-        dar = get_or_create_category(
-            session,
-            slug="dar",
-            name="Dar Al-Niaba",
-            kind=CategoryKind.journal,
-            parent=journals,
-        )
-
-        # Sample documents
-        samples = [
-            (
-                "An Introduction to Moroccan Trade Routes",
-                {
-                    "abstract": "Survey of trans-Saharan commerce between the 16th and 19th centuries.",
-                    "type": DocumentType.article,
-                    "lang": "en",
-                    "year": 2020,
-                    "pages": 34,
-                    "primary_category": dar,
-                },
-            ),
-            (
-                "Catalogue of Rif Manuscripts",
-                {
-                    "abstract": "Annotated catalogue of manuscripts preserved in the Rif region.",
-                    "type": DocumentType.archive_item,
-                    "lang": "fr",
-                    "year": 1998,
-                    "pages": 220,
-                    "primary_category": archives,
-                },
-            ),
-            (
-                "Field Survey of Tangier Landmarks",
-                {
-                    "abstract": "Documentation of architectural heritage across Tangier.",
-                    "type": DocumentType.report,
-                    "lang": "ar",
-                    "year": 2015,
-                    "pages": 88,
-                    "primary_category": sites,
-                },
-            ),
-        ]
-
-        for title, defaults in samples:
-            get_or_create_document(session, title=title, defaults=defaults)
-
+        for seed in seeds:
+            upsert_document(session, seed)
         session.commit()
-        print("Seed completed (basic categories & documents).")
+        print("Seeded foundational standalone documents.")
     except Exception:
         session.rollback()
         raise
@@ -137,4 +133,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run()

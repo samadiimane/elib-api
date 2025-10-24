@@ -1,70 +1,134 @@
-"""Development helper script to seed baseline navigation categories."""
-# scripts/dev_seed_categories.py
+"""Seed a baseline navigation taxonomy with descriptive academic language."""
 
 from __future__ import annotations
 
-from typing import Iterable
+from dataclasses import dataclass, field
+from typing import Iterable, Sequence
 
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.models import Category, CategoryKind, Document, DocumentType, Journal, JournalIssue
+from app.models import Category, CategoryKind
 from sqlalchemy.orm import configure_mappers
+
 configure_mappers()
 
 
-SeedNode = dict[str, object]
+@dataclass(frozen=True)
+class CategorySeed:
+    slug: str
+    name: str
+    kind: CategoryKind
+    description: str | None = None
+    children: tuple["CategorySeed", ...] = field(default_factory=tuple)
 
 
-SEED_TREE: tuple[SeedNode, ...] = (
-    {"slug": "library", "name": "Library", "kind": CategoryKind.section},
-    {
-        "slug": "journals",
-        "name": "Journals",
-        "kind": CategoryKind.section,
-        "children": (
-            {"slug": "dar", "name": "Dar Al-Niaba", "kind": CategoryKind.journal},
-            {"slug": "tang", "name": "Les Tangérois", "kind": CategoryKind.journal},
+SEED_TREE: tuple[CategorySeed, ...] = (
+    CategorySeed(
+        slug="library",
+        name="Library",
+        kind=CategoryKind.section,
+        description="Gateway to monographs, edited volumes, research reports, and curated bibliographies.",
+    ),
+    CategorySeed(
+        slug="journals",
+        name="Journals",
+        kind=CategoryKind.section,
+        description="Serial publications that disseminate peer-reviewed scholarship across Maghribi studies.",
+    ),
+    CategorySeed(
+        slug="archives",
+        name="Archives & Documentary Heritage",
+        kind=CategoryKind.section,
+        description="Finding aids and digitized corpora derived from manuscript, epistolary, and administrative fonds.",
+        children=(
+            CategorySeed(
+                slug="manuscript-guides",
+                name="Guides to Manuscript Collections",
+                kind=CategoryKind.archive_collection,
+                description="Inventories and paleographic studies of Arabic, Amazigh, and Ottoman manuscripts.",
+            ),
+            CategorySeed(
+                slug="digitization-projects",
+                name="Digitization Initiatives",
+                kind=CategoryKind.topic,
+                description="Reports on preservation and digitization of fragile archival holdings.",
+            ),
         ),
-    },
-    {
-        "slug": "archives",
-        "name": "Archives & Documentary Heritage",
-        "kind": CategoryKind.section,
-        "children": (
-            {
-                "slug": "rif",
-                "name": "Rif Sufi Manuscripts",
-                "kind": CategoryKind.archive_collection,
-            },
+    ),
+    CategorySeed(
+        slug="heritage-sites",
+        name="Heritage Sites & Landmarks",
+        kind=CategoryKind.section,
+        description="Documentation of architectural ensembles, archaeological sites, and landscape heritage.",
+        children=(
+            CategorySeed(
+                slug="coastal-forts",
+                name="Coastal Fortifications",
+                kind=CategoryKind.topic,
+                description="Studies of maritime defensive works spanning Portuguese, Spanish, and Moroccan polities.",
+            ),
+            CategorySeed(
+                slug="sacred-architecture",
+                name="Sacred Architecture",
+                kind=CategoryKind.topic,
+                description="Mosques, zawiyas, and pilgrimage complexes analysed through art historical lenses.",
+            ),
         ),
-    },
-    {"slug": "sites", "name": "Historical Sites & Landmarks", "kind": CategoryKind.section},
-    {
-        "slug": "issues",
-        "name": "Research Issues & Problematics",
-        "kind": CategoryKind.section,
-        "children": (
-            {
-                "slug": "medieval",
-                "name": "Medieval Moroccan Studies",
-                "kind": CategoryKind.topic,
-            },
+    ),
+    CategorySeed(
+        slug="research-themes",
+        name="Research Themes",
+        kind=CategoryKind.section,
+        description="Cross-cutting scholarly conversations connecting sources, spaces, and disciplines.",
+        children=(
+            CategorySeed(
+                slug="urban-histories",
+                name="Urban Histories",
+                kind=CategoryKind.topic,
+                description="Micro-histories of neighbourhoods, municipal governance, and everyday urban life.",
+            ),
+            CategorySeed(
+                slug="intellectual-networks",
+                name="Intellectual Networks",
+                kind=CategoryKind.topic,
+                description="Transmission of knowledge across scholarly lineages, madrasas, and Sufi lodges.",
+            ),
+            CategorySeed(
+                slug="material-culture",
+                name="Material Culture Studies",
+                kind=CategoryKind.topic,
+                description="Objects, artisanship, and museological practices anchored in the Maghrib.",
+            ),
         ),
-    },
+    ),
 )
 
 
-def ensure_category(session, slug: str, name: str, kind: CategoryKind, parent: Category | None = None) -> Category:
+def ensure_category(
+    session,
+    *,
+    slug: str,
+    name: str,
+    kind: CategoryKind,
+    description: str | None,
+    parent: Category | None = None,
+) -> Category:
     stmt = select(Category).where(Category.slug == slug)
-    existing = session.execute(stmt).scalar_one_or_none()
-    if existing:
-        return existing
+    category = session.execute(stmt).scalar_one_or_none()
+    if category:
+        category.name = name
+        category.kind = kind
+        category.description = description
+        if parent and category.parent_id != parent.id:
+            category.parent = parent
+        return category
 
     category = Category(
         slug=slug,
         name=name,
         kind=kind,
+        description=description,
         parent=parent,
     )
     session.add(category)
@@ -72,18 +136,18 @@ def ensure_category(session, slug: str, name: str, kind: CategoryKind, parent: C
     return category
 
 
-def seed_children(session, parent: Category, children: Iterable[SeedNode]) -> None:
+def seed_children(session, parent: Category, children: Sequence[CategorySeed]) -> None:
     for child in children:
         node = ensure_category(
             session,
-            slug=str(child["slug"]),
-            name=str(child["name"]),
-            kind=child["kind"],
+            slug=child.slug,
+            name=child.name,
+            kind=child.kind,
+            description=child.description,
             parent=parent,
         )
-        grandchildren = child.get("children")
-        if grandchildren:
-            seed_children(session, node, grandchildren)  # type: ignore[arg-type]
+        if child.children:
+            seed_children(session, node, child.children)
 
 
 def seed() -> None:
@@ -92,13 +156,14 @@ def seed() -> None:
         for node in SEED_TREE:
             parent = ensure_category(
                 session,
-                slug=str(node["slug"]),
-                name=str(node["name"]),
-                kind=node["kind"],
+                slug=node.slug,
+                name=node.name,
+                kind=node.kind,
+                description=node.description,
+                parent=None,
             )
-            children = node.get("children")
-            if children:
-                seed_children(session, parent, children)  # type: ignore[arg-type]
+            if node.children:
+                seed_children(session, parent, node.children)
 
         session.commit()
         print("Seeded navigation categories.")

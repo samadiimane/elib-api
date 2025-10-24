@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import Tuple
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session, aliased, load_only
+from sqlalchemy.orm import Session, aliased, load_only, selectinload
 from sqlalchemy.sql import ColumnElement
 
 from app.models.category import Category, CategoryKind
+from app.models.journal import Journal
 from app.models.document import Document
 from app.services.search import build_ilike_pattern
 
@@ -32,12 +33,18 @@ class CategoryRepository:
             .options(
                 load_only(
                     Category.id,
+                    Category.journal_id,
                     Category.slug,
                     Category.name,
                     Category.kind,
                     Category.parent_id,
                     Category.description,
-                )
+                ),
+                selectinload(Category.journal).load_only(
+                    Journal.id,
+                    Journal.slug,
+                    Journal.name,
+                ),
             )
         )
         count_stmt = select(func.count(Category.id))
@@ -76,12 +83,18 @@ class CategoryRepository:
             .options(
                 load_only(
                     Category.id,
+                    Category.journal_id,
                     Category.slug,
                     Category.name,
                     Category.kind,
                     Category.parent_id,
                     Category.description,
-                )
+                ),
+                selectinload(Category.journal).load_only(
+                    Journal.id,
+                    Journal.slug,
+                    Journal.name,
+                ),
             )
             .where(Category.slug == slug)
         )

@@ -1,13 +1,17 @@
 from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
-from sqlalchemy import String, Integer, Date, Text, ForeignKey
+
+from sqlalchemy import Date, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.db.session import Base
 
 if TYPE_CHECKING:
+    from app.models.category import Category
     from app.models.document import Document
-    
+
+
 class Journal(Base):
     __tablename__ = "journals"
 
@@ -23,6 +27,10 @@ class Journal(Base):
     )
     documents: Mapped[list["Document"]] = relationship(  # defined in document model
         back_populates="journal"
+    )
+    categories: Mapped[list["Category"]] = relationship(
+        "Category",
+        back_populates="journal",
     )
 
 class JournalIssue(Base):

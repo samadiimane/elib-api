@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence, Tuple
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, false, func, or_, select
 from sqlalchemy.orm import Session, load_only, selectinload
 from sqlalchemy.sql import ColumnElement
 
@@ -77,7 +77,16 @@ def build_base_filters(
         filters.append(Document.year <= year_to)
 
     if category_slug:
-        filters.append(Document.primary_category.has(Category.slug == category_slug))
+        category_row = session.execute(
+            select(Category.id, Category.journal_id).where(Category.slug == category_slug)
+        ).one_or_none()
+
+        if category_row is None:
+            filters.append(false())
+        elif category_row.journal_id is not None:
+            filters.append(Document.journal_id == category_row.journal_id)
+        else:
+            filters.append(Document.primary_category_id == category_row.id)
 
     if filters:
         stmt = stmt.where(*filters)
@@ -163,6 +172,7 @@ def facet_counts_by_category(
         )
         .select_from(subq)
         .join(Category, Category.id == subq.c.primary_category_id)
+        .where(Category.journal_id.is_(None))
         .group_by(Category.id, Category.slug, Category.name)
         .order_by(func.count().desc(), Category.name.asc())
         .limit(limit)
