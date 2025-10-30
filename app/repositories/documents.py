@@ -8,6 +8,7 @@ from sqlalchemy.sql import ColumnElement
 
 from app.models.category import Category
 from app.models.document import Document, DocumentType
+from app.repositories.categories import CategoryRepository
 from app.services.search import ilike_pattern
 
 DocumentSelect = Select[Tuple[Document]]
@@ -30,6 +31,7 @@ def build_base_filters(
     year_from: int | None = None,
     year_to: int | None = None,
     category_slug: str | None = None,
+    include_descendants: bool = False,
 ) -> DocumentSelect:
     stmt: DocumentSelect = (
         select(Document)
@@ -86,7 +88,11 @@ def build_base_filters(
         elif category_row.journal_id is not None:
             filters.append(Document.journal_id == category_row.journal_id)
         else:
-            filters.append(Document.primary_category_id == category_row.id)
+            category_ids = {category_row.id}
+            if include_descendants:
+                category_repo = CategoryRepository(session)
+                category_ids.update(category_repo.descendant_ids(category_row.id))
+            filters.append(Document.primary_category_id.in_(tuple(category_ids)))
 
     if filters:
         stmt = stmt.where(*filters)
@@ -240,6 +246,7 @@ class DocumentRepository:
         year_min: int | None = None,
         year_max: int | None = None,
         category_slug: str | None = None,
+        include_descendants: bool = False,
     ) -> DocumentSelect:
         return build_base_filters(
             self._session,
@@ -249,6 +256,7 @@ class DocumentRepository:
             year_from=year_min,
             year_to=year_max,
             category_slug=category_slug,
+            include_descendants=include_descendants,
         )
 
     def list(
@@ -260,6 +268,7 @@ class DocumentRepository:
         year_min: int | None = None,
         year_max: int | None = None,
         category_slug: str | None = None,
+        include_descendants: bool = False,
         order_by: ColumnElement,
         offset: int,
         limit: int,
@@ -273,6 +282,7 @@ class DocumentRepository:
             year_min=year_min,
             year_max=year_max,
             category_slug=category_slug,
+            include_descendants=include_descendants,
         )
         return list_documents(
             self._session,

@@ -52,15 +52,16 @@ SEARCH_SORTS = {
 @router.get("/documents", response_model=SearchDocumentsResponse)
 def search_documents(
     q: str | None = Query(default=None, min_length=1),
-    type_: List[DocumentType] | None = Query(default=None, alias="type"),
-    lang: List[str] | None = Query(default=None),
-    year_from: int | None = Query(default=None),
-    year_to: int | None = Query(default=None),
-    category: str | None = Query(default=None),
-    sort: str | None = Query(default="created_desc"),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
-    db: Session = Depends(get_db),
+   type_: List[DocumentType] | None = Query(default=None, alias="type"),
+   lang: List[str] | None = Query(default=None),
+   year_from: int | None = Query(default=None),
+   year_to: int | None = Query(default=None),
+   category: str | None = Query(default=None),
+    include_descendants: bool = Query(default=False),
+   sort: str | None = Query(default="created_desc"),
+   page: int = Query(default=1, ge=1),
+   page_size: int = Query(default=20, ge=1, le=100),
+   db: Session = Depends(get_db),
 ) -> SearchDocumentsResponse:
     if year_from is not None and year_to is not None and year_from > year_to:
         raise HTTPException(status_code=422, detail="year_from cannot be greater than year_to")
@@ -81,6 +82,7 @@ def search_documents(
         year_from=year_from,
         year_to=year_to,
         category_slug=category,
+        include_descendants=include_descendants,
     )
 
     documents, total = list_documents(

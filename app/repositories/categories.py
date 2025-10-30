@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Iterable, Tuple
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, aliased, load_only, selectinload
@@ -103,3 +103,54 @@ class CategoryRepository:
     def count_documents_for_category(self, category_id: int) -> int:
         stmt = select(func.count(Document.id)).where(Document.primary_category_id == category_id)
         return self._session.execute(stmt).scalar_one()
+
+    def get_children_by_slug(self, slug: str, kind: str | None = None) -> list[Category]:
+        """Return ordered immediate children for the category identified by slug."""
+        parent_id = self._session.execute(
+            select(Category.id).where(Category.slug == slug)
+        ).scalar_one_or_none()
+        if parent_id is None:
+            return []
+
+        stmt = (
+            select(Category)
+            .options(
+                load_only(
+                    Category.id,
+                    Category.slug,
+                    Category.name,
+                    Category.kind,
+                    Category.description,
+                )
+            )
+            .where(Category.parent_id == parent_id)
+            .order_by(Category.name.asc())
+        )
+
+        if kind is not None:
+            target_kind = kind
+            if not isinstance(target_kind, CategoryKind):
+                try:
+                    target_kind = CategoryKind(kind)
+                except ValueError:
+                    return []
+            stmt = stmt.where(Category.kind == target_kind)
+
+        return self._session.execute(stmt).scalars().all()
+
+    def descendant_ids(self, category_id: int) -> set[int]:
+        """Return ids for all descendant categories of the given category id."""
+        descendants_cte = (
+            select(Category.id)
+            .where(Category.parent_id == category_id)
+            .cte(name="category_descendants", recursive=True)
+        )
+
+        descendants_cte = descendants_cte.union_all(
+            select(Category.id).where(Category.parent_id == descendants_cte.c.id)
+        )
+
+        descendant_ids: Iterable[int] = self._session.execute(
+            select(descendants_cte.c.id)
+        ).scalars()
+        return set(descendant_ids)

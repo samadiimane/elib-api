@@ -35,6 +35,25 @@ class CategoryCounts(BaseModel):
     documents: int
 
 
+class CategoryChildOut(BaseModel):
+    """Serialized representation for a child category listing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    slug: str
+    name: str
+    kind: CategoryKind
+    description: str | None = None
+    counts: CategoryCounts | None = None
+
+
+class CategoryChildrenResponse(BaseModel):
+    """Envelope for category children listings."""
+
+    items: list[CategoryChildOut]
+
+
 class CategoryDetailOut(BaseModel):
     """Category detail payload including aggregated counts."""
 
@@ -42,4 +61,11 @@ class CategoryDetailOut(BaseModel):
     counts: CategoryCounts
 
 
-__all__ = ["CategoryOut", "CategoryCounts", "CategoryDetailOut", "LinkedJournal"]
+__all__ = [
+    "CategoryOut",
+    "CategoryCounts",
+    "CategoryChildOut",
+    "CategoryChildrenResponse",
+    "CategoryDetailOut",
+    "LinkedJournal",
+]

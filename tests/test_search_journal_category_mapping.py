@@ -73,5 +73,21 @@ def test_search_category_with_journal_maps_to_journal_filter(head_database) -> N
         topic_docs = session.execute(topic_base).scalars().all()
         assert {doc.id for doc in topic_docs} == expected_topic_doc_ids
 
+        journal_with_desc = build_base_filters(
+            session,
+            category_slug=journal_category_slug,
+            include_descendants=True,
+        )
+        journal_desc_docs = session.execute(journal_with_desc).scalars().all()
+        assert {doc.id for doc in journal_desc_docs} == expected_journal_doc_ids
+
+        topic_with_desc = build_base_filters(
+            session,
+            category_slug=topic_category_slug,
+            include_descendants=True,
+        )
+        topic_desc_docs = session.execute(topic_with_desc).scalars().all()
+        assert {doc.id for doc in topic_desc_docs} == expected_topic_doc_ids
+
         journal_facets = facet_counts_by_category(session, journal_base)
         assert all(slug != journal_category_slug for slug, _name, _count in journal_facets)
