@@ -58,6 +58,7 @@ def search_documents(
    year_to: int | None = Query(default=None),
    category: str | None = Query(default=None),
     include_descendants: bool = Query(default=False),
+   author: str | None = Query(default=None, min_length=1),
    sort: str | None = Query(default="created_desc"),
    page: int = Query(default=1, ge=1),
    page_size: int = Query(default=20, ge=1, le=100),
@@ -83,6 +84,7 @@ def search_documents(
         year_to=year_to,
         category_slug=category,
         include_descendants=include_descendants,
+        author=author,
     )
 
     documents, total = list_documents(

@@ -8,7 +8,16 @@ from typing import Sequence
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.models import Category, CategoryKind, Document, DocumentType, Journal, JournalIssue
+from app.models import (
+    Author,
+    Category,
+    CategoryKind,
+    Document,
+    DocumentAuthor,
+    DocumentType,
+    Journal,
+    JournalIssue,
+)
 from sqlalchemy.orm import configure_mappers
 
 configure_mappers()
@@ -49,6 +58,73 @@ class JournalSeed:
     publisher: str | None = None
     category_description: str | None = None
     issues: tuple[IssueSeed, ...] = field(default_factory=tuple)
+
+
+JOURNAL_AUTHOR_PROFILES: tuple[tuple[str, str | None, str | None], ...] = (
+    ("ليلى السوسي", "Laila Soussi", "مركز مغربي للدراسات التاريخية"),
+    ("يوسف المنصوري", "Youssef El Mansouri", "جامعة ابن طفيل"),
+)
+
+_AUTHOR_CACHE: dict[tuple[str, str | None, str | None], Author] = {}
+
+
+def get_or_create_author(
+    session,
+    full_name_ar: str,
+    full_name_lat: str | None = None,
+    affiliation: str | None = None,
+) -> Author:
+    """Fetch or create an author while keeping cached instances per run."""
+    key = (full_name_ar, full_name_lat, affiliation)
+    cached = _AUTHOR_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    stmt = select(Author).where(Author.full_name_ar == full_name_ar)
+    if full_name_lat is not None:
+        stmt = stmt.where(Author.full_name_lat == full_name_lat)
+    author = session.execute(stmt).scalar_one_or_none()
+
+    if author is None:
+        author = Author(
+            full_name_ar=full_name_ar,
+            full_name_lat=full_name_lat,
+            affiliation=affiliation,
+        )
+        session.add(author)
+        session.flush()
+    else:
+        updated = False
+        if full_name_lat is not None and author.full_name_lat != full_name_lat:
+            author.full_name_lat = full_name_lat
+            updated = True
+        if affiliation is not None and author.affiliation != affiliation:
+            author.affiliation = affiliation
+            updated = True
+        if updated:
+            session.flush()
+
+    _AUTHOR_CACHE[key] = author
+    return author
+
+
+def set_document_authors(document: Document, authors: Sequence[Author]) -> None:
+    """Ensure document authors match the provided ordered list."""
+    existing = {link.author_id: link for link in getattr(document, "author_links", [])}
+    desired_ids: set[int] = set()
+
+    for position, author in enumerate(authors, start=1):
+        desired_ids.add(author.id)
+        link = existing.get(author.id)
+        if link is None:
+            link = DocumentAuthor(author_id=author.id, position=position)
+            document.author_links.append(link)
+        else:
+            link.position = position
+
+    for link in list(getattr(document, "author_links", [])):
+        if link.author_id not in desired_ids:
+            document.author_links.remove(link)
 
 
 JOURNAL_SEEDS: tuple[JournalSeed, ...] = (
@@ -405,8 +481,8 @@ def upsert_issue(session, journal: Journal, seed: IssueSeed) -> JournalIssue:
 
 
 def upsert_article(session, journal: Journal, issue: JournalIssue, seed: ArticleSeed) -> None:
-    stmt = select(Document).where(Document.title == seed.title)
-    document = session.execute(stmt).scalar_one_or_none()
+    stmt = select(Document).where(Document.title == seed.title).order_by(Document.id.asc())
+    document = session.execute(stmt).scalars().first()
     topic = get_category_by_slug(session, seed.topic_slug) if seed.topic_slug else None
 
     if document:
@@ -419,22 +495,27 @@ def upsert_article(session, journal: Journal, issue: JournalIssue, seed: Article
         document.issue = issue
         document.journal = journal
         document.primary_category = topic
-        return
+    else:
+        document = Document(
+            title=seed.title,
+            abstract=seed.abstract,
+            type=DocumentType.article,
+            lang=seed.lang,
+            year=seed.year,
+            pages=seed.page_span,
+            start_page=seed.start_page,
+            end_page=seed.end_page,
+            journal=journal,
+            issue=issue,
+            primary_category=topic,
+        )
+        session.add(document)
 
-    document = Document(
-        title=seed.title,
-        abstract=seed.abstract,
-        type=DocumentType.article,
-        lang=seed.lang,
-        year=seed.year,
-        pages=seed.page_span,
-        start_page=seed.start_page,
-        end_page=seed.end_page,
-        journal=journal,
-        issue=issue,
-        primary_category=topic,
-    )
-    session.add(document)
+    authors = [
+        get_or_create_author(session, full_name_ar=profile[0], full_name_lat=profile[1], affiliation=profile[2])
+        for profile in JOURNAL_AUTHOR_PROFILES
+    ]
+    set_document_authors(document, authors)
 
 
 def run() -> None:

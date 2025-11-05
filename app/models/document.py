@@ -23,6 +23,7 @@ from app.db.session import Base
 if TYPE_CHECKING:
     from app.models.category import Category
     from app.models.journal import Journal, JournalIssue
+    from app.models.author import Author, DocumentAuthor
 
 
 class DocumentType(str, enum.Enum):
@@ -59,6 +60,7 @@ class Document(Base):
     doi: Mapped[str | None] = mapped_column(String(100), nullable=True)
     isbn: Mapped[str | None] = mapped_column(String(50), nullable=True)
     issn: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     journal_id: Mapped[int | None] = mapped_column(ForeignKey("journals.id", ondelete="SET NULL"))
     issue_id:   Mapped[int | None] = mapped_column(ForeignKey("journal_issues.id", ondelete="SET NULL"))
@@ -83,6 +85,19 @@ class Document(Base):
     primary_category: Mapped["Category | None"] = relationship(
         "Category",
         back_populates="documents",
+    )
+    author_links: Mapped[list["DocumentAuthor"]] = relationship(
+        "DocumentAuthor",
+        back_populates="document",
+        order_by="DocumentAuthor.position",
+        cascade="all, delete-orphan",
+    )
+    authors: Mapped[list["Author"]] = relationship(
+        "Author",
+        secondary="document_authors",
+        back_populates="documents",
+        order_by="DocumentAuthor.position",
+        viewonly=True,
     )
 
 

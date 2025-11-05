@@ -4,6 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session, selectinload
 from app.models.journal import Journal, JournalIssue
 from app.models.document import Document
+from app.models.author import Author
 
 def list_journals(
     db: Session,
@@ -86,7 +87,15 @@ def list_documents_for_journal(db: Session, journal_id: int, page: int, page_siz
     stmt = (
         select(Document)
         .where(Document.journal_id == journal_id)
-        .options(selectinload(Document.primary_category))
+        .options(
+            selectinload(Document.primary_category),
+            selectinload(Document.authors).load_only(
+                Author.id,
+                Author.full_name_ar,
+                Author.full_name_lat,
+                Author.affiliation,
+            ),
+        )
         .order_by(Document.created_at.desc())
     )
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
@@ -99,7 +108,15 @@ def list_documents_for_issue(db: Session, issue_id: int, page: int, page_size: i
     stmt = (
         select(Document)
         .where(Document.issue_id == issue_id)
-        .options(selectinload(Document.primary_category))
+        .options(
+            selectinload(Document.primary_category),
+            selectinload(Document.authors).load_only(
+                Author.id,
+                Author.full_name_ar,
+                Author.full_name_lat,
+                Author.affiliation,
+            ),
+        )
         .order_by(Document.start_page.asc().nulls_last(), Document.title.asc())
     )
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))

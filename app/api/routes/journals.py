@@ -72,7 +72,7 @@ def list_journal_articles(
     if not j:
         raise HTTPException(status_code=404, detail="Journal not found")
     docs, total = repo.list_documents_for_journal(db, j.id, page, page_size)
-    payload = [DocumentOut.model_validate(d.__dict__) for d in docs]
+    payload = [DocumentOut.model_validate(d) for d in docs]
     return PaginatedResponse[DocumentOut](items=payload, total=total, page=page, page_size=page_size, has_next=(page*page_size < (total or 0)))
 
 @router.get("/{slug}/issues/{issue_id}/articles", response_model=PaginatedResponse[DocumentOut])
@@ -88,5 +88,5 @@ def list_issue_articles(
         raise HTTPException(status_code=404, detail="Journal not found")
     # Optional: verify issue belongs to journal
     docs, total = repo.list_documents_for_issue(db, issue_id, page, page_size)
-    payload = [DocumentOut.model_validate(d.__dict__) for d in docs]
+    payload = [DocumentOut.model_validate(d) for d in docs]
     return PaginatedResponse[DocumentOut](items=payload, total=total, page=page, page_size=page_size, has_next=(page*page_size < (total or 0)))

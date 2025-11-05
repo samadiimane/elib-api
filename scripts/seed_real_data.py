@@ -3,16 +3,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
+from typing import Optional, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import configure_mappers
 
 from app.db.session import SessionLocal
 from app.models import (
-    Category, CategoryKind,
-    Journal, JournalIssue,
-    Document, DocumentType,
+    Author,
+    Category,
+    CategoryKind,
+    Journal,
+    JournalIssue,
+    Document,
+    DocumentAuthor,
+    DocumentType,
 )
 
 configure_mappers()
@@ -75,6 +80,76 @@ ARTICLES = [
 # Helpers (idempotent upserts)
 # -----------------------------
 
+DAR_AL_NIABA_AUTHOR_PROFILE: tuple[str, str | None, str | None] = (
+    "عبد العزيز خلوق التمسماني",
+    "Abdelaziz Khallouk Temsamani",
+    "مؤسسة تمسماني للبحث والدراسات",
+)
+
+_AUTHOR_CACHE: dict[tuple[str, str | None, str | None], Author] = {}
+
+
+def get_or_create_author(
+    session,
+    full_name_ar: str,
+    full_name_lat: str | None = None,
+    affiliation: str | None = None,
+) -> Author:
+    key = (full_name_ar, full_name_lat, affiliation)
+    cached = _AUTHOR_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    stmt = select(Author).where(Author.full_name_ar == full_name_ar)
+    if full_name_lat is not None:
+        stmt = stmt.where(Author.full_name_lat == full_name_lat)
+    author = session.execute(stmt).scalar_one_or_none()
+
+    if author is None:
+        author = Author(
+            full_name_ar=full_name_ar,
+            full_name_lat=full_name_lat,
+            affiliation=affiliation,
+        )
+        session.add(author)
+        session.flush()
+    else:
+        updated = False
+        if full_name_lat is not None and author.full_name_lat != full_name_lat:
+            author.full_name_lat = full_name_lat
+            updated = True
+        if affiliation is not None and author.affiliation != affiliation:
+            author.affiliation = affiliation
+            updated = True
+        if updated:
+            session.flush()
+
+    _AUTHOR_CACHE[key] = author
+    return author
+
+
+def set_document_authors(document: Document, authors: Sequence[Author]) -> None:
+    existing = {link.author_id: link for link in getattr(document, "author_links", [])}
+    desired_ids: set[int] = set()
+
+    for position, author in enumerate(authors, start=1):
+        desired_ids.add(author.id)
+        link = existing.get(author.id)
+        if link is None:
+            link = DocumentAuthor(author_id=author.id, position=position)
+            document.author_links.append(link)
+        else:
+            link.position = position
+
+    for link in list(getattr(document, "author_links", [])):
+        if link.author_id not in desired_ids:
+            document.author_links.remove(link)
+
+
+def ensure_lead_author(session) -> Author:
+    return get_or_create_author(session, *DAR_AL_NIABA_AUTHOR_PROFILE)
+
+
 def get_category(session, slug: str) -> Optional[Category]:
     return session.execute(select(Category).where(Category.slug == slug)).scalar_one_or_none()
 
@@ -130,7 +205,15 @@ def ensure_issue(session, *, journal: Journal, year: Optional[int],
     return issue
 
 def ensure_article(session, *, journal: Journal, issue: JournalIssue, payload: dict) -> Document:
-    d = session.execute(select(Document).where(Document.title == payload["title"])).scalar_one_or_none()
+    d = (
+        session.execute(
+            select(Document)
+            .where(Document.title == payload["title"])
+            .order_by(Document.id.asc())
+        )
+        .scalars()
+        .first()
+    )
     pages = None
     if payload.get("start_page") is not None and payload.get("end_page") is not None:
         pages = max(payload["end_page"] - payload["start_page"] + 1, 1)
@@ -151,23 +234,25 @@ def ensure_article(session, *, journal: Journal, issue: JournalIssue, payload: d
         d.journal = journal
         d.issue = issue
         d.primary_category = primary_cat
-        return d
+    else:
+        d = Document(
+            title=payload["title"],
+            abstract=payload.get("abstract"),
+            type=DocumentType.article,
+            lang=payload.get("lang") or "und",
+            year=payload.get("year"),
+            start_page=payload.get("start_page"),
+            end_page=payload.get("end_page"),
+            pages=pages,
+            journal=journal,
+            issue=issue,
+            primary_category=primary_cat,
+        )
+        session.add(d)
+        session.flush()
 
-    d = Document(
-        title=payload["title"],
-        abstract=payload.get("abstract"),
-        type=DocumentType.article,
-        lang=payload.get("lang") or "und",
-        year=payload.get("year"),
-        start_page=payload.get("start_page"),
-        end_page=payload.get("end_page"),
-        pages=pages,
-        journal=journal,
-        issue=issue,
-        primary_category=primary_cat,
-    )
-    session.add(d)
-    session.flush()
+    lead_author = ensure_lead_author(session)
+    set_document_authors(d, [lead_author])
     return d
 
 

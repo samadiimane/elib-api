@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.document import DocumentType
+from app.schemas.author import AuthorOut
 
 
 class PrimaryCategoryRef(BaseModel):
@@ -30,6 +31,8 @@ class DocumentOut(BaseModel):
     doi: str | None
     isbn: str | None
     issn: str | None
+    cover_image_url: str | None = None
+    authors: list[AuthorOut] = Field(default_factory=list)
     primary_category: PrimaryCategoryRef | None
 
 

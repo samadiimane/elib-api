@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
-from app.models import Category, Document, DocumentType
+from app.models import Author, Category, Document, DocumentAuthor, DocumentType
 from sqlalchemy.orm import configure_mappers
 
 configure_mappers()
@@ -26,6 +26,71 @@ class DocumentSeed:
     doi: str | None = None
     isbn: str | None = None
     issn: str | None = None
+
+
+BASIC_AUTHOR_PROFILES: tuple[tuple[str, str | None, str | None], ...] = (
+    ("هند العلمي", "Hind Alami", "مؤسسة تمسماني للبحث والدراسات"),
+    ("مروان الطنجي", "Marouane Ettangi", "مختبر الأرشفة الرقمية"),
+)
+
+_AUTHOR_CACHE: dict[tuple[str, str | None, str | None], Author] = {}
+
+
+def get_or_create_author(
+    session,
+    full_name_ar: str,
+    full_name_lat: str | None = None,
+    affiliation: str | None = None,
+) -> Author:
+    key = (full_name_ar, full_name_lat, affiliation)
+    cached = _AUTHOR_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    stmt = select(Author).where(Author.full_name_ar == full_name_ar)
+    if full_name_lat is not None:
+        stmt = stmt.where(Author.full_name_lat == full_name_lat)
+    author = session.execute(stmt).scalar_one_or_none()
+
+    if author is None:
+        author = Author(
+            full_name_ar=full_name_ar,
+            full_name_lat=full_name_lat,
+            affiliation=affiliation,
+        )
+        session.add(author)
+        session.flush()
+    else:
+        updated = False
+        if full_name_lat is not None and author.full_name_lat != full_name_lat:
+            author.full_name_lat = full_name_lat
+            updated = True
+        if affiliation is not None and author.affiliation != affiliation:
+            author.affiliation = affiliation
+            updated = True
+        if updated:
+            session.flush()
+
+    _AUTHOR_CACHE[key] = author
+    return author
+
+
+def set_document_authors(document: Document, authors: Sequence[Author]) -> None:
+    existing = {link.author_id: link for link in getattr(document, "author_links", [])}
+    desired_ids: set[int] = set()
+
+    for position, author in enumerate(authors, start=1):
+        desired_ids.add(author.id)
+        link = existing.get(author.id)
+        if link is None:
+            link = DocumentAuthor(author_id=author.id, position=position)
+            document.author_links.append(link)
+        else:
+            link.position = position
+
+    for link in list(getattr(document, "author_links", [])):
+        if link.author_id not in desired_ids:
+            document.author_links.remove(link)
 
 
 DOCUMENT_SEEDS: tuple[DocumentSeed, ...] = (
@@ -88,7 +153,7 @@ def get_category(session, slug: str | None) -> Category | None:
 
 def upsert_document(session, seed: DocumentSeed) -> None:
     stmt = select(Document).where(Document.title == seed.title)
-    document = session.execute(stmt).scalar_one_or_none()
+    document = session.execute(stmt.order_by(Document.id.asc())).scalars().first()
     category = get_category(session, seed.category_slug)
 
     if document:
@@ -101,21 +166,26 @@ def upsert_document(session, seed: DocumentSeed) -> None:
         document.doi = seed.doi
         document.isbn = seed.isbn
         document.issn = seed.issn
-        return
+    else:
+        document = Document(
+            title=seed.title,
+            abstract=seed.abstract,
+            type=seed.type,
+            lang=seed.lang,
+            year=seed.year,
+            pages=seed.pages,
+            primary_category=category,
+            doi=seed.doi,
+            isbn=seed.isbn,
+            issn=seed.issn,
+        )
+        session.add(document)
 
-    document = Document(
-        title=seed.title,
-        abstract=seed.abstract,
-        type=seed.type,
-        lang=seed.lang,
-        year=seed.year,
-        pages=seed.pages,
-        primary_category=category,
-        doi=seed.doi,
-        isbn=seed.isbn,
-        issn=seed.issn,
-    )
-    session.add(document)
+    authors = [
+        get_or_create_author(session, full_name_ar=profile[0], full_name_lat=profile[1], affiliation=profile[2])
+        for profile in BASIC_AUTHOR_PROFILES
+    ]
+    set_document_authors(document, authors)
 
 
 def run(seeds: Iterable[DocumentSeed] = DOCUMENT_SEEDS) -> None:

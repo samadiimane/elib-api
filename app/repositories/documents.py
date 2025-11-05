@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import Iterable, Sequence, Tuple
 
 from sqlalchemy import Select, false, func, or_, select
-from sqlalchemy.orm import Session, load_only, selectinload
+from sqlalchemy.orm import Session, aliased, load_only, selectinload
 from sqlalchemy.sql import ColumnElement
 
 from app.models.category import Category
+from app.models.author import Author, DocumentAuthor
 from app.models.document import Document, DocumentType
 from app.repositories.categories import CategoryRepository
 from app.services.search import ilike_pattern
@@ -22,6 +23,47 @@ def _normalize_sequence(value: Iterable | None) -> tuple:
     return (value,)
 
 
+def _apply_author_filter(
+    session: Session,
+    stmt: DocumentSelect,
+    author_query: str | None,
+) -> DocumentSelect:
+    if not author_query:
+        return stmt
+
+    term = author_query.strip()
+    if not term:
+        return stmt
+
+    bind = session.get_bind()
+    dialect_name = bind.dialect.name if bind is not None else None
+    pattern = ilike_pattern(term)
+
+    author_alias = aliased(Author, name="author_filter")
+    link_alias = aliased(DocumentAuthor, name="document_author_filter")
+
+    def _ilike(column):
+        base = func.coalesce(column, "")
+        if dialect_name == "postgresql":
+            return func.unaccent(base).ilike(func.unaccent(pattern), escape="\\")
+        return base.ilike(pattern, escape="\\")
+
+    match_clause = or_(
+        _ilike(author_alias.full_name_ar),
+        _ilike(author_alias.full_name_lat),
+        _ilike(author_alias.affiliation),
+    )
+
+    author_subquery = (
+        select(link_alias.document_id)
+        .join(author_alias, author_alias.id == link_alias.author_id)
+        .where(match_clause)
+        .distinct()
+    )
+
+    return stmt.where(Document.id.in_(author_subquery))
+
+
 def build_base_filters(
     session: Session,
     *,
@@ -32,6 +74,7 @@ def build_base_filters(
     year_to: int | None = None,
     category_slug: str | None = None,
     include_descendants: bool = False,
+    author: str | None = None,
 ) -> DocumentSelect:
     stmt: DocumentSelect = (
         select(Document)
@@ -47,12 +90,19 @@ def build_base_filters(
                 Document.doi,
                 Document.isbn,
                 Document.issn,
+                Document.cover_image_url,
                 Document.primary_category_id,
             ),
             selectinload(Document.primary_category).load_only(
                 Category.id,
                 Category.slug,
                 Category.name,
+            ),
+            selectinload(Document.authors).load_only(
+                Author.id,
+                Author.full_name_ar,
+                Author.full_name_lat,
+                Author.affiliation,
             ),
         )
         .order_by(None)
@@ -97,7 +147,7 @@ def build_base_filters(
     if filters:
         stmt = stmt.where(*filters)
 
-    return stmt
+    return _apply_author_filter(session, stmt, author)
 
 
 def list_documents(
@@ -247,6 +297,7 @@ class DocumentRepository:
         year_max: int | None = None,
         category_slug: str | None = None,
         include_descendants: bool = False,
+        author: str | None = None,
     ) -> DocumentSelect:
         return build_base_filters(
             self._session,
@@ -257,6 +308,7 @@ class DocumentRepository:
             year_to=year_max,
             category_slug=category_slug,
             include_descendants=include_descendants,
+            author=author,
         )
 
     def list(
@@ -272,6 +324,7 @@ class DocumentRepository:
         order_by: ColumnElement,
         offset: int,
         limit: int,
+        author: str | None = None,
     ) -> Tuple[list[Document], int]:
         page_size = max(limit, 1)
         page = (offset // page_size) + 1 if page_size else 1
@@ -283,6 +336,7 @@ class DocumentRepository:
             year_max=year_max,
             category_slug=category_slug,
             include_descendants=include_descendants,
+            author=author,
         )
         return list_documents(
             self._session,
@@ -300,8 +354,55 @@ class DocumentRepository:
                     Category.id,
                     Category.slug,
                     Category.name,
-                )
+                ),
+                selectinload(Document.authors).load_only(
+                    Author.id,
+                    Author.full_name_ar,
+                    Author.full_name_lat,
+                    Author.affiliation,
+                ),
             )
             .where(Document.id == document_id)
         )
         return self._session.execute(stmt).scalar_one_or_none()
+
+    def assign_authors(self, document: Document, author_ids: Sequence[int]) -> None:
+        """Assign ordered authors to a document by their identifiers."""
+
+        normalized_ids: list[int] = []
+        seen: set[int] = set()
+        for raw_id in author_ids:
+            if raw_id is None:
+                continue
+            value = int(raw_id)
+            if value in seen:
+                continue
+            normalized_ids.append(value)
+            seen.add(value)
+
+        if not normalized_ids:
+            document.author_links.clear()
+            return
+
+        authors = self._session.execute(
+            select(Author).where(Author.id.in_(normalized_ids))
+        ).scalars().all()
+        authors_by_id = {author.id: author for author in authors}
+        missing = [aid for aid in normalized_ids if aid not in authors_by_id]
+        if missing:
+            raise ValueError(f"Unknown author ids: {missing}")
+
+        existing_links = {link.author_id: link for link in document.author_links}
+
+        for position, author_id in enumerate(normalized_ids, start=1):
+            author = authors_by_id[author_id]
+            link = existing_links.pop(author_id, None)
+            if link is None:
+                link = DocumentAuthor(author_id=author.id, position=position)
+                document.author_links.append(link)
+            else:
+                link.position = position
+
+        for leftover in existing_links.values():
+            if leftover in document.author_links:
+                document.author_links.remove(leftover)

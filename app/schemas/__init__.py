@@ -8,6 +8,7 @@ from app.schemas.category import (
     CategoryOut,
 )
 from app.schemas.document import DocumentOut, PrimaryCategoryRef
+from app.schemas.author import AuthorOut
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.search import (
     FacetCategory,
@@ -28,6 +29,7 @@ __all__ = [
     "CategoryDetailOut",
     "CategoryOut",
     "DocumentOut",
+    "AuthorOut",
     "PaginatedResponse",
     "PrimaryCategoryRef",
     "FacetCategory",

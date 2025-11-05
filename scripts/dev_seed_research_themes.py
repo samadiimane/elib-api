@@ -16,13 +16,20 @@ curl "http://127.0.0.1:8010/v1/search/documents?category_slug=material-culture"
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import configure_mappers
 
 from app.db.session import SessionLocal
-from app.models import Category, CategoryKind, Document, DocumentType
+from app.models import (
+    Author,
+    Category,
+    CategoryKind,
+    Document,
+    DocumentAuthor,
+    DocumentType,
+)
 
 configure_mappers()
 
@@ -39,6 +46,71 @@ class DocumentSeed:
     doi: str | None = None
     isbn: str | None = None
     issn: str | None = None
+
+
+THEME_AUTHOR_PROFILES: tuple[tuple[str, str | None, str | None], ...] = (
+    ("جميلة الرواحي", "Jamila El Rawahi", "شبكة بحوث الذاكرة"),
+    ("خالد البقالي", "Khalid El Baqali", "منتدى التراث المشترك"),
+)
+
+_AUTHOR_CACHE: dict[tuple[str, str | None, str | None], Author] = {}
+
+
+def get_or_create_author(
+    session,
+    full_name_ar: str,
+    full_name_lat: str | None = None,
+    affiliation: str | None = None,
+) -> Author:
+    key = (full_name_ar, full_name_lat, affiliation)
+    cached = _AUTHOR_CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    stmt = select(Author).where(Author.full_name_ar == full_name_ar)
+    if full_name_lat is not None:
+        stmt = stmt.where(Author.full_name_lat == full_name_lat)
+    author = session.execute(stmt).scalar_one_or_none()
+
+    if author is None:
+        author = Author(
+            full_name_ar=full_name_ar,
+            full_name_lat=full_name_lat,
+            affiliation=affiliation,
+        )
+        session.add(author)
+        session.flush()
+    else:
+        updated = False
+        if full_name_lat is not None and author.full_name_lat != full_name_lat:
+            author.full_name_lat = full_name_lat
+            updated = True
+        if affiliation is not None and author.affiliation != affiliation:
+            author.affiliation = affiliation
+            updated = True
+        if updated:
+            session.flush()
+
+    _AUTHOR_CACHE[key] = author
+    return author
+
+
+def set_document_authors(document: Document, authors: Sequence[Author]) -> None:
+    existing = {link.author_id: link for link in getattr(document, "author_links", [])}
+    desired_ids: set[int] = set()
+
+    for position, author in enumerate(authors, start=1):
+        desired_ids.add(author.id)
+        link = existing.get(author.id)
+        if link is None:
+            link = DocumentAuthor(author_id=author.id, position=position)
+            document.author_links.append(link)
+        else:
+            link.position = position
+
+    for link in list(getattr(document, "author_links", [])):
+        if link.author_id not in desired_ids:
+            document.author_links.remove(link)
 
 
 CATEGORY_DEFAULTS = {
@@ -266,7 +338,13 @@ def ensure_required_categories(session) -> dict[str, Category]:
 
 
 def upsert_document(session, seed: DocumentSeed, categories: dict[str, Category]) -> tuple[bool, bool]:
-    document = session.execute(select(Document).where(Document.title == seed.title)).scalar_one_or_none()
+    document = (
+        session.execute(
+            select(Document).where(Document.title == seed.title).order_by(Document.id.asc())
+        )
+        .scalars()
+        .first()
+    )
     created = False
     updated = False
     category = categories[seed.primary_category_slug]
@@ -293,21 +371,26 @@ def upsert_document(session, seed: DocumentSeed, categories: dict[str, Category]
         session.add(document)
         session.flush()
         created = True
-        return created, updated
+    else:
+        maybe_set(document, "abstract", seed.abstract)
+        maybe_set(document, "lang", seed.lang)
+        maybe_set(document, "year", seed.year)
+        if document.type != seed.doc_type:
+            document.type = seed.doc_type
+            updated = True
+        maybe_set(document, "pages", seed.pages)
+        maybe_set(document, "doi", seed.doi)
+        maybe_set(document, "isbn", seed.isbn)
+        maybe_set(document, "issn", seed.issn)
+        if document.primary_category_id != category.id:
+            document.primary_category = category
+            updated = True
 
-    maybe_set(document, "abstract", seed.abstract)
-    maybe_set(document, "lang", seed.lang)
-    maybe_set(document, "year", seed.year)
-    if document.type != seed.doc_type:
-        document.type = seed.doc_type
-        updated = True
-    maybe_set(document, "pages", seed.pages)
-    maybe_set(document, "doi", seed.doi)
-    maybe_set(document, "isbn", seed.isbn)
-    maybe_set(document, "issn", seed.issn)
-    if document.primary_category_id != category.id:
-        document.primary_category = category
-        updated = True
+    authors = [
+        get_or_create_author(session, full_name_ar=profile[0], full_name_lat=profile[1], affiliation=profile[2])
+        for profile in THEME_AUTHOR_PROFILES
+    ]
+    set_document_authors(document, authors)
     return created, updated
 
 
