@@ -11,6 +11,7 @@ from app.repositories.documents import (
     facet_year_range,
     list_documents,
 )
+from app.repositories.events import EventRepository, serialize_winners
 
 __all__ = [
     "CategoryRepository",
@@ -22,4 +23,6 @@ __all__ = [
     "facet_year_buckets_decade",
     "facet_year_range",
     "list_documents",
+    "EventRepository",
+    "serialize_winners",
 ]

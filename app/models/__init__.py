@@ -6,6 +6,14 @@ from app.models.category import Category, CategoryKind
 from app.models.document import Document, DocumentType
 from app.models.journal import Journal, JournalIssue
 from app.models.author import Author, DocumentAuthor
+from app.models.event import (
+    EVENT_TYPES,
+    Event,
+    AwardEvent,
+    AwardWinner,
+    ExhibitionEvent,
+    SeminarEvent,
+)
 
 __all__ = [
     "Base",
@@ -17,4 +25,10 @@ __all__ = [
     "JournalIssue",
     "Author",
     "DocumentAuthor",
+    "EVENT_TYPES",
+    "Event",
+    "AwardEvent",
+    "AwardWinner",
+    "ExhibitionEvent",
+    "SeminarEvent",
 ]

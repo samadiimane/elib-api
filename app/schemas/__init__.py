@@ -18,7 +18,16 @@ from app.schemas.search import (
     SearchDocumentsResponse,
     SearchFacets,
 )
-
+from app.schemas.event import (
+    EventBaseOut,
+    EventDetailOut,
+    AwardDetailsOut,
+    ExhibitionDetailsOut,
+    SeminarDetailsOut,
+    AwardWinnerOut,
+    SeminarSpeakerOut,
+    SeminarAgendaItemOut,
+)
 from app.schemas.journal import JournalOut, JournalCounts, JournalDetailOut, JournalIssueOut
 
 
@@ -42,4 +51,12 @@ __all__ = [
     "JournalCounts",
     "JournalDetailOut",
     "JournalIssueOut",
+    "EventBaseOut",
+    "EventDetailOut",
+    "AwardDetailsOut",
+    "ExhibitionDetailsOut",
+    "SeminarDetailsOut",
+    "AwardWinnerOut",
+    "SeminarSpeakerOut",
+    "SeminarAgendaItemOut",
 ]
