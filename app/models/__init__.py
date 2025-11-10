@@ -14,6 +14,13 @@ from app.models.event import (
     ExhibitionEvent,
     SeminarEvent,
 )
+from app.models.user import (
+    AuthIdentity,
+    AuthProvider,
+    User,
+    UserRole,
+    UserRoleEnum,
+)
 
 __all__ = [
     "Base",
@@ -31,4 +38,9 @@ __all__ = [
     "AwardWinner",
     "ExhibitionEvent",
     "SeminarEvent",
+    "User",
+    "AuthIdentity",
+    "AuthProvider",
+    "UserRole",
+    "UserRoleEnum",
 ]

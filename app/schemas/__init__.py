@@ -29,6 +29,17 @@ from app.schemas.event import (
     SeminarAgendaItemOut,
 )
 from app.schemas.journal import JournalOut, JournalCounts, JournalDetailOut, JournalIssueOut
+from app.schemas.user import (
+    AuthIdentityOut,
+    AuthResponse,
+    GoogleAuthRequest,
+    LoginRequest,
+    RoleRequest,
+    TokenResponse,
+    UserCreateRequest,
+    UserOut,
+    UserRoleOut,
+)
 
 
 __all__ = [
@@ -59,4 +70,13 @@ __all__ = [
     "AwardWinnerOut",
     "SeminarSpeakerOut",
     "SeminarAgendaItemOut",
+    "AuthIdentityOut",
+    "UserRoleOut",
+    "UserOut",
+    "UserCreateRequest",
+    "LoginRequest",
+    "GoogleAuthRequest",
+    "RoleRequest",
+    "TokenResponse",
+    "AuthResponse",
 ]

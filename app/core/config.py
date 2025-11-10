@@ -1,6 +1,7 @@
 # app/core/config.py  (pydantic v2)
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -22,6 +23,10 @@ class Settings(BaseSettings):
     # Optional: if i ever want to build absolute public URLs (we’ll use presigned instead)
     storage_cdn_base: str | None = Field(default=None, alias="STORAGE_CDN_BASE")
 
+    # auth
+    auth_secret: str = Field(default="change-me", alias="AUTH_SECRET")
+    access_token_exp_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXP_MINUTES")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors(cls, v):
@@ -41,3 +46,8 @@ class Settings(BaseSettings):
         return [x.strip() for x in s.split(",") if x.strip()]
 
 settings = Settings()
+
+
+if settings.database_url.startswith("sqlite:///./"):
+    db_file = Path(__file__).resolve().parent.parent.parent / "dev.db"
+    settings.database_url = f"sqlite:///{db_file.as_posix()}"
