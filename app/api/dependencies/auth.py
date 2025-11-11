@@ -48,8 +48,6 @@ def get_current_user(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
         # Detach so the object can outlive the session.
         session.expunge(user)
-        for role in list(user.roles):
-            session.expunge(role)
         return user
     finally:
         session.close()
