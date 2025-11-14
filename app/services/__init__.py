@@ -20,6 +20,7 @@ from app.services.auth import (
     hash_password,
     link_google_identity,
     remove_role,
+    set_user_roles,
     validate_google_id_token,
     verify_password,
 )
@@ -42,6 +43,7 @@ __all__ = [
     "hash_password",
     "link_google_identity",
     "remove_role",
+    "set_user_roles",
     "validate_google_id_token",
     "verify_password",
 ]

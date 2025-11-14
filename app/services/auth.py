@@ -324,6 +324,35 @@ def remove_role(
     return True
 
 
+def set_user_roles(
+    session: Session,
+    *,
+    user: User,
+    roles: Iterable[UserRoleEnum | str],
+) -> list[UserRole]:
+    """Replace a user's roles atomically."""
+    replacement = _unique_roles(_normalize_roles(roles))
+    desired = {role for role in replacement}
+
+    existing: dict[UserRoleEnum, UserRole] = {}
+    for user_role in list(user.roles):
+        role_enum = _coerce_role(user_role.role)
+        if role_enum in desired:
+            existing[role_enum] = user_role
+            continue
+        session.delete(user_role)
+
+    for role in desired:
+        if role in existing:
+            continue
+        new_role = UserRole(role=role)
+        user.roles.append(new_role)
+        session.add(new_role)
+
+    session.flush()
+    return user.roles
+
+
 def _normalize_roles(
     roles: Iterable[UserRoleEnum | str] | None,
 ) -> list[UserRoleEnum]:
@@ -368,6 +397,7 @@ __all__ = [
     "hash_password",
     "link_google_identity",
     "remove_role",
+    "set_user_roles",
     "validate_google_id_token",
     "verify_password",
 ]

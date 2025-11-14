@@ -64,6 +64,37 @@ class AuthResponse(TokenResponse):
     user: UserOut
 
 
+class AdminUserOut(BaseModel):
+    """Slimmer admin-facing representation."""
+
+    id: int
+    email: EmailStr
+    is_active: bool
+    roles: list[UserRoleEnum]
+    created_at: datetime
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    roles: list[UserRoleEnum] | None = None
+
+
+class AdminUserUpdateRoles(BaseModel):
+    roles: list[UserRoleEnum] = Field(min_length=0)
+
+
+class AdminUserToggleActive(BaseModel):
+    is_active: bool
+
+
+class AdminUsersPage(BaseModel):
+    items: list[AdminUserOut]
+    total: int
+    page: int
+    page_size: int
+
+
 __all__ = [
     "AuthIdentityOut",
     "UserRoleOut",
@@ -74,4 +105,9 @@ __all__ = [
     "RoleRequest",
     "TokenResponse",
     "AuthResponse",
+    "AdminUserOut",
+    "AdminUserCreate",
+    "AdminUserUpdateRoles",
+    "AdminUserToggleActive",
+    "AdminUsersPage",
 ]
