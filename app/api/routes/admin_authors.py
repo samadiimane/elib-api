@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Generator, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -43,6 +43,7 @@ def _serialize_item(item: AuthorListItemData) -> AuthorListItemOut:
         affiliation=item.affiliation,
         slug=item.slug,
         created_at=item.created_at,
+        deleted_at=item.deleted_at,
     )
 
 
@@ -62,9 +63,10 @@ def list_authors(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=50),
     sort: Literal["name", "created_at"] = Query(default="name"),
+    status: Literal["active", "deleted", "all"] = Query(default="active"),
     repo: AuthorAdminRepository = Depends(get_repository),
 ) -> AuthorListResponse:
-    payload = repo.list_authors(q=q, page=page, page_size=page_size, sort=sort)
+    payload = repo.list_authors(q=q, page=page, page_size=page_size, sort=sort, status=status)
     return _serialize_response(payload)
 
 
@@ -86,5 +88,38 @@ def create_author(
         raise
 
 
-__all__ = ["router", "get_db"]
+@router.patch("/{author_id}/soft-delete", status_code=status.HTTP_204_NO_CONTENT)
+def soft_delete_author(
+    author_id: int = Path(..., ge=1),
+    repo: AuthorAdminRepository = Depends(get_repository),
+) -> None:
+    db = repo.session
+    try:
+        repo.soft_delete_author(author_id)
+        db.commit()
+    except AuthorAdminError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail={"user_message": exc.message}) from exc
+    except Exception:
+        db.rollback()
+        raise
 
+
+@router.patch("/{author_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
+def restore_author(
+    author_id: int = Path(..., ge=1),
+    repo: AuthorAdminRepository = Depends(get_repository),
+) -> None:
+    db = repo.session
+    try:
+        repo.restore_author(author_id)
+        db.commit()
+    except AuthorAdminError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status_code, detail={"user_message": exc.message}) from exc
+    except Exception:
+        db.rollback()
+        raise
+
+
+__all__ = ["router", "get_db"]

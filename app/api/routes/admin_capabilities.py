@@ -41,14 +41,17 @@ class AuthorCapabilities(BaseModel):
     create: bool
     update: bool
     delete: bool
+    softDelete: bool
+    restore: bool
 
 
 class JournalCapabilities(BaseModel):
     list: bool
     create: bool
     update: bool
-    delete: bool
-    issues: bool
+    softDelete: bool
+    restore: bool
+    coverPresign: bool
 
 
 class CollectionCapabilities(BaseModel):
@@ -98,8 +101,15 @@ DEFAULT_ADMIN_CAPABILITIES = AdminCapabilities(
         presign=True,
     ),
     categories=CategoryCapabilities(treeRead=True, treeWrite=True, reorder=True, move=True),
-    authors=AuthorCapabilities(list=True, create=True, update=False, delete=False),
-    journals=JournalCapabilities(list=True, create=True, update=True, delete=True, issues=True),
+    authors=AuthorCapabilities(list=True, create=True, update=True, delete=True, softDelete=True, restore=True),
+    journals=JournalCapabilities(
+        list=True,
+        create=True,
+        update=True,
+        softDelete=True,
+        restore=True,
+        coverPresign=True,
+    ),
     collections=CollectionCapabilities(
         list=True,
         create=True,

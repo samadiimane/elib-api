@@ -117,3 +117,37 @@ def test_create_author_success_and_duplicate_slug(head_database):
             assert stored.full_name_ar == payload["name_ar"]
     finally:
         _clear_overrides()
+
+
+def test_soft_delete_and_restore(head_database):
+    SessionLocal, _engine = head_database
+    with SessionLocal.begin() as session:
+        author = Author(full_name_ar="Author AR", full_name_lat="Author EN", affiliation=None, slug="author-en")
+        session.add(author)
+        session.flush()
+        author_id = author.id
+
+    _apply_overrides(SessionLocal, _admin_identity())
+    client = TestClient(app)
+    try:
+        response = client.patch(f"/v1/admin/authors/{author_id}/soft-delete")
+        assert response.status_code == 204
+
+        list_active = client.get("/v1/admin/authors")
+        assert list_active.status_code == 200
+        assert list_active.json()["total"] == 0
+
+        list_deleted = client.get("/v1/admin/authors", params={"status": "deleted"})
+        assert list_deleted.status_code == 200
+        assert list_deleted.json()["total"] == 1
+        assert list_deleted.json()["items"][0]["deleted_at"] is not None
+
+        restore = client.patch(f"/v1/admin/authors/{author_id}/restore")
+        assert restore.status_code == 204
+
+        list_active_after = client.get("/v1/admin/authors")
+        assert list_active_after.status_code == 200
+        assert list_active_after.json()["total"] == 1
+        assert list_active_after.json()["items"][0]["deleted_at"] is None
+    finally:
+        _clear_overrides()

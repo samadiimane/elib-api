@@ -14,6 +14,7 @@ class AuthorListItemOut(BaseModel):
     affiliation: str | None = None
     slug: str
     created_at: datetime
+    deleted_at: datetime | None = None
 
 
 class AuthorCreate(BaseModel):
@@ -27,4 +28,3 @@ class AuthorListResponse(PaginatedResponse[AuthorListItemOut]):
 
 
 __all__ = ["AuthorListItemOut", "AuthorCreate", "AuthorListResponse"]
-

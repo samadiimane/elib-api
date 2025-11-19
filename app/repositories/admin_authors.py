@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.author import Author
@@ -40,6 +40,7 @@ class AuthorListItemData:
     affiliation: str | None
     slug: str
     created_at: datetime
+    deleted_at: datetime | None = None
 
 
 @dataclass
@@ -68,6 +69,7 @@ class AuthorAdminRepository:
         page: int,
         page_size: int,
         sort: Literal["name", "created_at"],
+        status: Literal["active", "deleted", "all"],
     ) -> PaginatedAuthors:
         page = max(1, page)
         page_size = max(1, min(page_size, 50))
@@ -76,15 +78,18 @@ class AuthorAdminRepository:
         if q:
             pattern = f"%{q.strip().lower()}%"
             filters.append(func.lower(func.coalesce(Author.full_name_lat, "")).like(pattern))
+        if status == "active":
+            filters.append(Author.deleted_at.is_(None))
+        elif status == "deleted":
+            filters.append(Author.deleted_at.is_not(None))
 
         base_stmt = select(Author)
-        if filters:
-            for clause in filters:
-                base_stmt = base_stmt.where(clause)
+        for clause in filters:
+            base_stmt = base_stmt.where(clause)
 
         count_stmt = select(func.count()).select_from(Author)
-        if filters:
-            count_stmt = count_stmt.where(*filters)
+        for clause in filters:
+            count_stmt = count_stmt.where(clause)
         total = self._session.execute(count_stmt).scalar_one()
 
         if sort == "created_at":
@@ -146,8 +151,32 @@ class AuthorAdminRepository:
             affiliation=author.affiliation,
             slug=author.slug or "",
             created_at=author.created_at,
+            deleted_at=author.deleted_at,
         )
+
+    def soft_delete_author(self, author_id: int) -> None:
+        stmt = (
+            update(Author)
+            .where(Author.id == author_id)
+            .values(deleted_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+        result = self._session.execute(stmt)
+        self._session.expire_all()
+        if result.rowcount == 0:
+            raise AuthorAdminError("Author not found.", status_code=404)
+
+    def restore_author(self, author_id: int) -> None:
+        stmt = (
+            update(Author)
+            .where(Author.id == author_id)
+            .values(deleted_at=None)
+            .execution_options(synchronize_session=False)
+        )
+        result = self._session.execute(stmt)
+        self._session.expire_all()
+        if result.rowcount == 0:
+            raise AuthorAdminError("Author not found.", status_code=404)
 
 
 __all__ = ["AuthorAdminRepository", "AuthorAdminError", "AuthorListItemData", "PaginatedAuthors"]
-
