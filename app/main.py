@@ -10,6 +10,9 @@ from app.api.routes.journals import router as journals_router
 from app.api.routes.events import router as events_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.admin import router as admin_router
+from app.api.routes.admin_capabilities import router as admin_capabilities_router
+from app.api.routes.admin_categories import router as admin_categories_router
+from app.api.routes.admin_authors import router as admin_authors_router
 
 app = FastAPI(title="eLibrary API")
 
@@ -20,6 +23,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -33,3 +37,6 @@ app.include_router(journals_router)
 app.include_router(events_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(admin_capabilities_router)
+app.include_router(admin_categories_router)
+app.include_router(admin_authors_router)

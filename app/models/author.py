@@ -14,7 +14,11 @@ if TYPE_CHECKING:
 
 class Author(Base):
     __tablename__ = "authors"
-    __table_args__ = (UniqueConstraint("slug", name="uq_authors_slug"),)
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_authors_slug"),
+        Index("ix_authors_full_name_lat", "full_name_lat"),
+        Index("ix_authors_created_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     full_name_ar: Mapped[str] = mapped_column(String(255), nullable=False)
