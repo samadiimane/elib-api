@@ -49,8 +49,18 @@ def test_admin_capabilities_returns_static_payload_for_admin_roles():
             assert payload["authors"] == {
                 "list": True,
                 "create": True,
-                "update": False,
-                "delete": False,
+                "update": True,
+                "delete": True,
+                "softDelete": True,
+                "restore": True,
+            }
+            assert payload["journals"] == {
+                "list": True,
+                "create": True,
+                "update": True,
+                "softDelete": True,
+                "restore": True,
+                "coverPresign": True,
             }
         finally:
             _clear_overrides()

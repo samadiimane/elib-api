@@ -13,7 +13,7 @@ def list_journals(
     page: int,
     page_size: int,
 ):
-    stmt = select(Journal)
+    stmt = select(Journal).where(Journal.deleted_at.is_(None))
     if q:
         ilike = f"%{q.strip()}%"
         stmt = stmt.where(Journal.name.ilike(ilike))
@@ -35,6 +35,7 @@ def get_journal_by_slug(db: Session, slug: str) -> Journal | None:
         select(Journal)
         .options(selectinload(Journal.issues))
         .where(Journal.slug == slug)
+        .where(Journal.deleted_at.is_(None))
     )
     return db.execute(stmt).scalar_one_or_none()
 
