@@ -14,6 +14,7 @@ from app.repositories.admin_journals import (
     JournalListItemData,
     PaginatedJournals,
 )
+from app.schemas.admin_issue import AdminIssueListResponse
 from app.schemas.admin_journal import (
     JournalCreate,
     JournalListItemOut,
@@ -172,6 +173,38 @@ def restore_journal(
         raise _handle_error(exc)
     except Exception:
         db.rollback()
+        raise _handle_unexpected_error()
+
+
+@router.get("/{journal_id}/issues", response_model=AdminIssueListResponse)
+def list_journal_issues(
+    journal_id: int = Path(..., ge=1),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    q: str | None = Query(None),
+    year: int | None = Query(None),
+    sort: Literal[
+        "year_desc",
+        "year_asc",
+        "number_desc",
+        "number_asc",
+        "created_desc",
+        "created_asc",
+    ] = Query("year_desc"),
+    repo: JournalAdminRepository = Depends(get_repository),
+) -> AdminIssueListResponse:
+    try:
+        return repo.list_issues(
+            journal_id=journal_id,
+            q=q,
+            year=year,
+            page=page,
+            page_size=page_size,
+            sort=sort,
+        )
+    except JournalAdminError as exc:
+        raise _handle_error(exc)
+    except Exception:
         raise _handle_unexpected_error()
 
 

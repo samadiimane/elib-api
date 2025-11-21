@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, load_only
 from app.models.document import Document, DocumentType
 from app.models.journal import Journal, JournalIssue
 from app.schemas.admin_journal import JournalCreate, JournalUpdate
+from app.schemas.admin_issue import AdminIssueListItemOut, AdminIssueListResponse
 
 
 class JournalAdminError(Exception):
@@ -266,6 +267,88 @@ class JournalAdminRepository:
         self._session.expire_all()
         if result.rowcount == 0:
             raise JournalAdminError("Journal not found.", status_code=404, code="JOURNAL_NOT_FOUND")
+
+    def list_issues(
+        self,
+        journal_id: int,
+        *,
+        q: str | None,
+        year: int | None,
+        page: int,
+        page_size: int,
+        sort: Literal["year_desc", "year_asc", "number_desc", "number_asc", "created_desc", "created_asc"],
+    ) -> AdminIssueListResponse:
+        page = max(1, page)
+        page_size = max(1, min(page_size, 100))
+
+        filters = [JournalIssue.journal_id == journal_id]
+        if q:
+            pattern = f"%{q.strip()}%"
+            filters.append(JournalIssue.title.ilike(pattern))
+        if year is not None:
+            filters.append(JournalIssue.year == year)
+
+        order_by = {
+            "year_desc": (JournalIssue.year.desc(), JournalIssue.id.desc()),
+            "year_asc": (JournalIssue.year.asc(), JournalIssue.id.asc()),
+            "number_desc": (JournalIssue.number.desc().nulls_last(), JournalIssue.id.desc()),
+            "number_asc": (JournalIssue.number.asc().nulls_last(), JournalIssue.id.asc()),
+            "created_desc": (JournalIssue.id.desc(),),
+            "created_asc": (JournalIssue.id.asc(),),
+        }.get(sort, (JournalIssue.year.desc(), JournalIssue.id.desc()))
+
+        articles_count_subquery = (
+            select(func.count(Document.id))
+            .where(Document.issue_id == JournalIssue.id)
+            .where(Document.type == DocumentType.article)
+            .correlate(JournalIssue)
+            .scalar_subquery()
+        )
+
+        stmt = (
+            select(
+                JournalIssue.id,
+                JournalIssue.journal_id,
+                JournalIssue.volume,
+                JournalIssue.number,
+                JournalIssue.year,
+                JournalIssue.title,
+                JournalIssue.issue_date,
+                articles_count_subquery.label("articles_count"),
+            )
+            .where(*filters)
+            .order_by(*order_by)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        total_stmt = select(func.count()).select_from(JournalIssue).where(*filters)
+        total = self._session.execute(total_stmt).scalar_one()
+
+        rows = self._session.execute(stmt).all()
+        items = [
+            AdminIssueListItemOut(
+                id=row.id,
+                journal_id=row.journal_id,
+                volume=row.volume,
+                number=row.number,
+                year=row.year,
+                title=row.title,
+                cover_image_url=None,
+                published_at=row.issue_date,
+                articles_count=row.articles_count or 0,
+                created_at=None,
+            )
+            for row in rows
+        ]
+        has_next = page * page_size < (total or 0)
+        return AdminIssueListResponse(
+            items=items,
+            total=total,
+            page=page,
+            page_size=page_size,
+            has_next=has_next,
+        )
 
     def _serialize_list_item(
         self,
