@@ -13,7 +13,7 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.admin_capabilities import router as admin_capabilities_router
 from app.api.routes.admin_categories import router as admin_categories_router
 from app.api.routes.admin_authors import router as admin_authors_router
-from app.api.routes.admin_journals import router as admin_journals_router
+from app.api.routes.admin_journals import router as admin_journals_router, issue_router as admin_issue_router
 from app.api.routes.uploads import router as uploads_router
 
 app = FastAPI(title="eLibrary API")
@@ -43,4 +43,5 @@ app.include_router(admin_capabilities_router)
 app.include_router(admin_categories_router)
 app.include_router(admin_authors_router)
 app.include_router(admin_journals_router)
+app.include_router(admin_issue_router)
 app.include_router(uploads_router)

@@ -123,6 +123,67 @@ def test_list_journal_issues_filters_and_sorts(head_database):
         _clear_overrides()
 
 
+def test_issue_crud_and_delete_guard(head_database):
+    SessionLocal, _engine = head_database
+    with SessionLocal.begin() as session:
+        journal = Journal(name="CRUD", slug="crud")
+        session.add(journal)
+        session.flush()
+        journal_id = journal.id
+
+    _apply_overrides(SessionLocal, _admin_identity())
+    client = TestClient(app)
+    try:
+        # create
+        resp = client.post(
+            f"/v1/admin/journals/{journal_id}/issues",
+            json={"year": 2024, "number": 1, "title": "Vol 1"},
+        )
+        assert resp.status_code == 201, resp.text
+        issue = resp.json()
+        issue_id = issue["id"]
+
+        # duplicate
+        dup = client.post(
+            f"/v1/admin/journals/{journal_id}/issues",
+            json={"year": 2024, "number": 1, "title": "Dup"},
+        )
+        assert dup.status_code == 409
+
+        # update
+        upd = client.patch(f"/v1/admin/issues/{issue_id}", json={"title": "Updated"})
+        assert upd.status_code == 200
+        assert upd.json()["title"] == "Updated"
+
+        # block delete when articles
+        with SessionLocal.begin() as session:
+            session.add(
+                Document(
+                    title="Article",
+                    type=DocumentType.article,
+                    lang="en",
+                    journal_id=journal_id,
+                    issue_id=issue_id,
+                )
+            )
+        blocked = client.delete(f"/v1/admin/issues/{issue_id}")
+        assert blocked.status_code == 409
+
+        # allow delete when no articles
+        with SessionLocal.begin() as session:
+            session.execute(
+                select(Document)
+                .where(Document.issue_id == issue_id)
+                .with_for_update()
+            )
+            session.query(Document).filter(Document.issue_id == issue_id).delete()
+        allowed = client.delete(f"/v1/admin/issues/{issue_id}")
+        assert allowed.status_code == 200
+        assert allowed.json()["ok"] is True
+    finally:
+        _clear_overrides()
+
+
 def test_repository_list_issues_constant_queries(head_database):
     SessionLocal, engine = head_database
     with SessionLocal.begin() as session:

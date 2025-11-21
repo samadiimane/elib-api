@@ -14,7 +14,12 @@ from app.repositories.admin_journals import (
     JournalListItemData,
     PaginatedJournals,
 )
-from app.schemas.admin_issue import AdminIssueListResponse
+from app.schemas.admin_issue import (
+    AdminIssueListResponse,
+    AdminIssueCreate,
+    AdminIssueUpdate,
+    AdminIssueListItemOut,
+)
 from app.schemas.admin_journal import (
     JournalCreate,
     JournalListItemOut,
@@ -26,6 +31,11 @@ from app.schemas.admin_journal import (
 router = APIRouter(
     prefix="/v1/admin/journals",
     tags=["admin-journals"],
+    dependencies=[Depends(require_roles(UserRoleEnum.admin))],
+)
+issue_router = APIRouter(
+    prefix="/v1/admin/issues",
+    tags=["admin-issues"],
     dependencies=[Depends(require_roles(UserRoleEnum.admin))],
 )
 
@@ -208,4 +218,60 @@ def list_journal_issues(
         raise _handle_unexpected_error()
 
 
-__all__ = ["router", "get_db"]
+@router.post("/{journal_id}/issues", response_model=AdminIssueListItemOut, status_code=status.HTTP_201_CREATED)
+def create_issue(
+    journal_id: int = Path(..., ge=1),
+    payload: AdminIssueCreate = None,
+    repo: JournalAdminRepository = Depends(get_repository),
+) -> AdminIssueListItemOut:
+    db = repo.session
+    try:
+        item = repo.create_issue(journal_id, payload or AdminIssueCreate())
+        db.commit()
+        return item
+    except JournalAdminError as exc:
+        db.rollback()
+        raise _handle_error(exc)
+    except Exception:
+        db.rollback()
+        raise _handle_unexpected_error()
+
+
+@issue_router.patch("/{issue_id}", response_model=AdminIssueListItemOut)
+def update_issue(
+    issue_id: int = Path(..., ge=1),
+    payload: AdminIssueUpdate = None,
+    repo: JournalAdminRepository = Depends(get_repository),
+) -> AdminIssueListItemOut:
+    db = repo.session
+    try:
+        item = repo.update_issue(issue_id, payload or AdminIssueUpdate())
+        db.commit()
+        return item
+    except JournalAdminError as exc:
+        db.rollback()
+        raise _handle_error(exc)
+    except Exception:
+        db.rollback()
+        raise _handle_unexpected_error()
+
+
+@issue_router.delete("/{issue_id}")
+def delete_issue(
+    issue_id: int = Path(..., ge=1),
+    repo: JournalAdminRepository = Depends(get_repository),
+) -> dict[str, bool]:
+    db = repo.session
+    try:
+        repo.delete_issue(issue_id)
+        db.commit()
+        return {"ok": True}
+    except JournalAdminError as exc:
+        db.rollback()
+        raise _handle_error(exc)
+    except Exception:
+        db.rollback()
+        raise _handle_unexpected_error()
+
+
+__all__ = ["router", "issue_router", "get_db"]

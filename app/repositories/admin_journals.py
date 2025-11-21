@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session, load_only
 from app.models.document import Document, DocumentType
 from app.models.journal import Journal, JournalIssue
 from app.schemas.admin_journal import JournalCreate, JournalUpdate
-from app.schemas.admin_issue import AdminIssueListItemOut, AdminIssueListResponse
+from app.schemas.admin_issue import (
+    AdminIssueListItemOut,
+    AdminIssueListResponse,
+    AdminIssueCreate,
+    AdminIssueUpdate,
+)
 
 
 class JournalAdminError(Exception):
@@ -349,6 +354,127 @@ class JournalAdminRepository:
             page_size=page_size,
             has_next=has_next,
         )
+
+    def create_issue(self, journal_id: int, payload: AdminIssueCreate) -> AdminIssueListItemOut:
+        self._validate_issue_payload(payload)
+        self._assert_issue_unique(journal_id, payload.year, payload.number)
+
+        issue = JournalIssue(
+            journal_id=journal_id,
+            title=_normalize_optional(payload.title),
+            year=payload.year,
+            number=payload.number,
+            volume=payload.volume,
+            issue_date=payload.published_at,
+        )
+        self._session.add(issue)
+        self._session.flush()
+        self._session.refresh(issue)
+        articles_count = self._issue_articles_count(issue.id)
+        return self._serialize_issue(issue, articles_count)
+
+    def update_issue(self, issue_id: int, patch: AdminIssueUpdate) -> AdminIssueListItemOut:
+        issue = self._session.get(JournalIssue, issue_id)
+        if issue is None:
+            raise JournalAdminError("Issue not found.", status_code=404, code="ISSUE_NOT_FOUND")
+
+        self._validate_issue_payload(patch)
+
+        if patch.year is not None:
+            issue.year = patch.year
+        if patch.number is not None:
+            issue.number = patch.number
+        if patch.volume is not None:
+            issue.volume = patch.volume
+        if patch.title is not None:
+            issue.title = _normalize_optional(patch.title)
+        if patch.published_at is not None:
+            issue.issue_date = patch.published_at
+
+        if issue.year is not None and issue.number is not None:
+            self._assert_issue_unique(issue.journal_id, issue.year, issue.number, exclude_id=issue.id)
+
+        self._session.flush()
+        self._session.refresh(issue)
+        articles_count = self._issue_articles_count(issue.id)
+        return self._serialize_issue(issue, articles_count)
+
+    def delete_issue(self, issue_id: int) -> None:
+        issue = self._session.get(JournalIssue, issue_id)
+        if issue is None:
+            raise JournalAdminError("Issue not found.", status_code=404, code="ISSUE_NOT_FOUND")
+
+        articles_count = self._issue_articles_count(issue.id)
+        if articles_count > 0:
+            raise JournalAdminError(
+                "Cannot delete an issue that has articles.",
+                status_code=409,
+                code="ISSUE_HAS_ARTICLES",
+            )
+
+        self._session.delete(issue)
+        self._session.flush()
+
+    # -----------------------
+    # Helpers
+    # -----------------------
+
+    def _issue_articles_count(self, issue_id: int) -> int:
+        return (
+            self._session.execute(
+                select(func.count(Document.id)).where(
+                    Document.issue_id == issue_id, Document.type == DocumentType.article
+                )
+            ).scalar_one()
+            or 0
+        )
+
+    def _serialize_issue(self, issue: JournalIssue, articles_count: int) -> AdminIssueListItemOut:
+        return AdminIssueListItemOut(
+            id=issue.id,
+            journal_id=issue.journal_id,
+            volume=issue.volume,
+            number=issue.number,
+            year=issue.year,
+            title=issue.title,
+            cover_image_url=None,
+            published_at=issue.issue_date,
+            articles_count=articles_count,
+            created_at=None,
+        )
+
+    def _validate_issue_payload(self, payload: AdminIssueCreate | AdminIssueUpdate) -> None:
+        if payload.year is not None and not (1800 <= payload.year <= 2100):
+            raise JournalAdminError("Year must be between 1800 and 2100.", status_code=400, code="INVALID_YEAR")
+        for field_name in ("number", "volume"):
+            value = getattr(payload, field_name, None)
+            if value is not None and value < 0:
+                raise JournalAdminError(f"{field_name.capitalize()} must be non-negative.", status_code=400, code="INVALID_NUMBER")
+
+    def _assert_issue_unique(
+        self,
+        journal_id: int,
+        year: int | None,
+        number: int | None,
+        *,
+        exclude_id: int | None = None,
+    ) -> None:
+        if year is None or number is None:
+            return
+        stmt = select(JournalIssue.id).where(
+            JournalIssue.journal_id == journal_id,
+            JournalIssue.year == year,
+            JournalIssue.number == number,
+        )
+        if exclude_id is not None:
+            stmt = stmt.where(JournalIssue.id != exclude_id)
+        exists = self._session.execute(stmt.limit(1)).scalar_one_or_none()
+        if exists is not None:
+            raise JournalAdminError(
+                "An issue with this year and number already exists.",
+                status_code=409,
+                code="ISSUE_DUPLICATE",
+            )
 
     def _serialize_list_item(
         self,

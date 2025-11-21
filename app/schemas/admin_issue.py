@@ -25,4 +25,25 @@ class AdminIssueListResponse(BaseModel):
     has_next: bool
 
 
-__all__ = ["AdminIssueListItemOut", "AdminIssueListResponse"]
+class AdminIssueCreate(BaseModel):
+    title: str | None = None
+    year: int | None = None
+    number: int | None = None
+    volume: int | None = None
+    published_at: datetime | None = None
+
+
+class AdminIssueUpdate(BaseModel):
+    title: str | None = None
+    year: int | None = None
+    number: int | None = None
+    volume: int | None = None
+    published_at: datetime | None = None
+
+
+__all__ = [
+    "AdminIssueListItemOut",
+    "AdminIssueListResponse",
+    "AdminIssueCreate",
+    "AdminIssueUpdate",
+]
