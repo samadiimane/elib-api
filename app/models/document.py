@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -42,6 +42,7 @@ class Document(Base):
     __table_args__ = (
         Index("ix_documents_type", "type"),
         Index("ix_documents_year", "year"),
+        Index("ix_documents_deleted_at", "deleted_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -61,6 +62,7 @@ class Document(Base):
     isbn: Mapped[str | None] = mapped_column(String(50), nullable=True)
     issn: Mapped[str | None] = mapped_column(String(50), nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     journal_id: Mapped[int | None] = mapped_column(ForeignKey("journals.id", ondelete="SET NULL"))
     issue_id:   Mapped[int | None] = mapped_column(ForeignKey("journal_issues.id", ondelete="SET NULL"))
@@ -81,6 +83,7 @@ class Document(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     primary_category: Mapped["Category | None"] = relationship(
         "Category",
@@ -99,6 +102,10 @@ class Document(Base):
         order_by="DocumentAuthor.position",
         viewonly=True,
     )
+
+    @property
+    def status(self) -> str:
+        return "deleted" if self.deleted_at is not None else "active"
 
 
 __all__ = ["Document", "DocumentType"]

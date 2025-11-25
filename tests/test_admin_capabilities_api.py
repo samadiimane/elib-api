@@ -46,6 +46,14 @@ def test_admin_capabilities_returns_static_payload_for_admin_roles():
             assert response.status_code == 200
             payload = response.json()
             assert payload == admin_capabilities_routes.DEFAULT_ADMIN_CAPABILITIES.model_dump()
+            assert payload["documents"] == {
+                "list": True,
+                "create": True,
+                "update": True,
+                "delete": True,
+                "restore": True,
+                "presign": True,
+            }
             assert payload["authors"] == {
                 "list": True,
                 "create": True,

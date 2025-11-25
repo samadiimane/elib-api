@@ -9,6 +9,14 @@ from app.schemas.category import (
 )
 from app.schemas.document import DocumentOut, PrimaryCategoryRef
 from app.schemas.author import AuthorOut
+from app.schemas.admin_document import (
+    AdminDocumentAuthorRef,
+    AdminDocumentDetailOut,
+    AdminDocumentIssueRef,
+    AdminDocumentJournalRef,
+    AdminDocumentListItemOut,
+    AdminDocumentPrimaryCategory,
+)
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.search import (
     FacetCategory,
@@ -54,6 +62,12 @@ __all__ = [
     "CategoryDetailOut",
     "CategoryOut",
     "DocumentOut",
+    "AdminDocumentListItemOut",
+    "AdminDocumentDetailOut",
+    "AdminDocumentAuthorRef",
+    "AdminDocumentPrimaryCategory",
+    "AdminDocumentJournalRef",
+    "AdminDocumentIssueRef",
     "AuthorOut",
     "PaginatedResponse",
     "PrimaryCategoryRef",

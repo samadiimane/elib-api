@@ -25,7 +25,7 @@ class DocumentCapabilities(BaseModel):
     create: bool
     update: bool
     delete: bool
-    status: bool
+    restore: bool
     presign: bool
 
 
@@ -97,7 +97,7 @@ DEFAULT_ADMIN_CAPABILITIES = AdminCapabilities(
         create=True,
         update=True,
         delete=True,
-        status=True,
+        restore=True,
         presign=True,
     ),
     categories=CategoryCapabilities(treeRead=True, treeWrite=True, reorder=True, move=True),

@@ -75,6 +75,7 @@ def build_base_filters(
     category_slug: str | None = None,
     include_descendants: bool = False,
     author: str | None = None,
+    include_deleted: bool = False,
 ) -> DocumentSelect:
     stmt: DocumentSelect = (
         select(Document)
@@ -109,6 +110,9 @@ def build_base_filters(
     )
 
     filters: list = []
+
+    if not include_deleted:
+        filters.append(Document.deleted_at.is_(None))
 
     if q:
         pattern = ilike_pattern(q)
