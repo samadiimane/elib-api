@@ -15,6 +15,7 @@ class CategoryNodeOut(BaseModel):
     slug: str
     kind: CategoryKind
     parent_id: int | None
+    journal_id: int | None = None
     order: int = Field(serialization_alias="order")
     document_count: int | None = None
     children: list["CategoryNodeOut"] | None = None

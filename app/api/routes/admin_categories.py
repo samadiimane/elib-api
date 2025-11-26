@@ -54,6 +54,7 @@ def _serialize_node(node: CategoryNodeData) -> CategoryNodeOut:
         slug=node.slug,
         kind=node.kind,
         parent_id=node.parent_id,
+        journal_id=node.journal_id,
         order=node.order,
         document_count=node.document_count,
         children=children,
@@ -81,6 +82,7 @@ def _serialize_category(category, repo: CategoryAdminRepository) -> CategoryNode
         slug=category.slug,
         kind=category.kind,
         parent_id=category.parent_id,
+        journal_id=category.journal_id,
         order=category.order_index,
         document_count=repo.document_count(category.id),
         children=None,
@@ -248,4 +250,3 @@ def move_category(
     except Exception:
         db.rollback()
         raise
-

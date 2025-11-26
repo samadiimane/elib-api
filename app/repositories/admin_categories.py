@@ -40,6 +40,7 @@ class CategoryNodeData:
     kind: CategoryKind
     parent_id: int | None
     order: int
+    journal_id: int | None = None
     document_count: int | None = None
     children: list["CategoryNodeData"] | None = field(default=None)
 
@@ -150,7 +151,18 @@ class CategoryAdminRepository:
         if parent_id is not None:
             filters.append(Category.parent_id == parent_id)
 
-        stmt = select(Category)
+        stmt = select(Category).options(
+            load_only(
+                Category.id,
+                Category.name,
+                Category.slug,
+                Category.kind,
+                Category.parent_id,
+                Category.journal_id,
+                Category.order_index,
+                Category.created_at,
+            )
+        )
         count_stmt = select(func.count(Category.id))
         if filters:
             stmt = stmt.where(*filters)
@@ -313,6 +325,17 @@ class CategoryAdminRepository:
     def _fetch_root_categories(self, *, kind: CategoryKind | None) -> list[Category]:
         stmt = (
             select(Category)
+            .options(
+                load_only(
+                    Category.id,
+                    Category.name,
+                    Category.slug,
+                    Category.kind,
+                    Category.parent_id,
+                    Category.journal_id,
+                    Category.order_index,
+                )
+            )
             .where(Category.parent_id.is_(None))
             .order_by(Category.order_index.asc(), Category.id.asc())
         )
@@ -330,6 +353,17 @@ class CategoryAdminRepository:
             return {}
         stmt = (
             select(Category)
+            .options(
+                load_only(
+                    Category.id,
+                    Category.name,
+                    Category.slug,
+                    Category.kind,
+                    Category.parent_id,
+                    Category.journal_id,
+                    Category.order_index,
+                )
+            )
             .where(Category.parent_id.in_(parent_ids))
             .order_by(Category.order_index.asc(), Category.id.asc())
         )
@@ -363,6 +397,7 @@ class CategoryAdminRepository:
                     slug=category.slug,
                     kind=category.kind,
                     parent_id=category.parent_id,
+                    journal_id=category.journal_id,
                     order=category.order_index,
                     document_count=counts.get(category.id),
                     children=child_nodes,

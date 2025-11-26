@@ -9,6 +9,7 @@ from app.api.dependencies import auth as auth_dependencies
 from app.api.routes import admin_categories as admin_categories_routes
 from app.main import app
 from app.models.category import Category, CategoryKind
+from app.models.journal import Journal
 from app.models.document import Document, DocumentType
 from app.models.user import UserRoleEnum
 
@@ -40,16 +41,65 @@ def _clear_overrides():
     app.dependency_overrides.pop(auth_dependencies.get_current_user, None)
 
 
-def _insert_category(session, *, name: str, slug: str, kind: CategoryKind, parent: Category | None = None) -> Category:
+def _insert_category(session, *, name: str, slug: str, kind: CategoryKind, parent: Category | None = None, journal_id: int | None = None) -> Category:
     category = Category(
         name=name,
         slug=slug,
         kind=kind,
         parent_id=parent.id if parent else None,
+        journal_id=journal_id,
     )
     session.add(category)
     session.flush()
     return category
+
+
+def test_children_response_includes_kind_slug_and_journal_id(head_database) -> None:
+    SessionLocal, _engine = head_database
+    with SessionLocal.begin() as session:
+        parent = _insert_category(session, name="Parent", slug="parent-for-children", kind=CategoryKind.section)
+        journal = Journal(slug="linked-journal", name="Linked Journal")
+        session.add(journal)
+        session.flush()
+        journal_id = journal.id
+        _insert_category(
+            session,
+            name="Journal Child",
+            slug="journal-child",
+            kind=CategoryKind.journal,
+            parent=parent,
+            journal_id=journal_id,
+        )
+        _insert_category(
+            session,
+            name="Topic Child",
+            slug="topic-child",
+            kind=CategoryKind.topic,
+            parent=parent,
+        )
+        parent_id = parent.id
+
+    _apply_admin_overrides(SessionLocal)
+    try:
+        client = TestClient(app)
+        response = client.get(f"/v1/admin/categories/children/{parent_id}")
+        assert response.status_code == 200, response.text
+        items = response.json()
+        assert isinstance(items, list)
+        by_slug = {item["slug"]: item for item in items}
+        assert set(by_slug) == {"journal-child", "topic-child"}
+
+        journal_child = by_slug["journal-child"]
+        assert journal_child["kind"] == CategoryKind.journal.value
+        assert "journal_id" in journal_child
+        assert journal_child["journal_id"] == journal_id
+
+        topic_child = by_slug["topic-child"]
+        assert topic_child["kind"] == CategoryKind.topic.value
+        assert "journal_id" in topic_child
+        assert topic_child["journal_id"] is None
+    finally:
+        _clear_overrides()
 
 
 def test_create_category_duplicate_slug_conflict(head_database) -> None:
