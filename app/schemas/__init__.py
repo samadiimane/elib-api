@@ -36,7 +36,14 @@ from app.schemas.event import (
     SeminarSpeakerOut,
     SeminarAgendaItemOut,
 )
-from app.schemas.journal import JournalOut, JournalCounts, JournalDetailOut, JournalIssueOut
+from app.schemas.journal import (
+    JournalOut,
+    JournalCounts,
+    JournalDetailOut,
+    JournalIssueOut,
+    JournalTranslationOut,
+    IssueTranslationOut,
+)
 from app.schemas.user import (
     AdminUserCreate,
     AdminUserOut,
@@ -81,6 +88,8 @@ __all__ = [
     "JournalCounts",
     "JournalDetailOut",
     "JournalIssueOut",
+    "JournalTranslationOut",
+    "IssueTranslationOut",
     "EventBaseOut",
     "EventDetailOut",
     "AwardDetailsOut",

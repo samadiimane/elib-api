@@ -2,7 +2,19 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, Integer, String, Text, event, func, select
+from sqlalchemy import (
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    event,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -46,6 +58,11 @@ class Journal(Base):
         "Category",
         back_populates="journal",
     )
+    translations: Mapped[list["JournalTranslation"]] = relationship(
+        "JournalTranslation",
+        back_populates="journal",
+        cascade="all, delete-orphan",
+    )
 
 
 @event.listens_for(Journal, "before_insert")
@@ -84,3 +101,21 @@ class JournalIssue(Base):
     documents: Mapped[list["Document"]] = relationship(  # defined in document model
         back_populates="issue"
     )
+
+
+class JournalTranslation(Base):
+    __tablename__ = "journal_translations"
+    __table_args__ = (
+        UniqueConstraint("journal_id", "locale", name="uq_journal_translations_journal_locale"),
+        Index("ix_journal_translations_journal_id", "journal_id"),
+        Index("ix_journal_translations_locale", "locale"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    journal_id: Mapped[int] = mapped_column(ForeignKey("journals.id", ondelete="CASCADE"), nullable=False)
+    locale: Mapped[str] = mapped_column(String(10), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    publisher: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    journal: Mapped[Journal] = relationship(back_populates="translations")

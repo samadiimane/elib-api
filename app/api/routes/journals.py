@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, Query, Path, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
+from app.core.config import settings
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.journal import JournalOut, JournalCounts, JournalDetailOut, JournalIssueOut
 from app.schemas.document import DocumentOut
@@ -22,22 +23,30 @@ def list_journals(
     sort: str = Query("name asc"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    locale: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
 ):
     if sort not in {"name asc", "name desc"}:
         raise HTTPException(status_code=422, detail="Invalid sort")
-    items, total = repo.list_journals(db, q, sort, page, page_size)
-    payload = [JournalOut.model_validate(i.__dict__) for i in items]
+    normalized_locale = _normalize_locale(locale)
+    items, total = repo.list_journals(db, q, sort, page, page_size, normalized_locale)
+    payload = [JournalOut.model_validate(i) for i in items]
     return PaginatedResponse[JournalOut](items=payload, total=total, page=page, page_size=page_size, has_next=(page*page_size < (total or 0)))
 
 @router.get("/{slug}", response_model=JournalDetailOut)
-def get_journal(slug: str = Path(...), db: Session = Depends(get_db)):
-    j = repo.get_journal_by_slug(db, slug)
+def get_journal(
+    slug: str = Path(...),
+    locale: str | None = Query(None, max_length=10),
+    db: Session = Depends(get_db),
+):
+    normalized_locale = _normalize_locale(locale)
+    j = repo.get_journal_by_slug(db, slug, normalized_locale)
     if not j:
         raise HTTPException(status_code=404, detail="Journal not found")
     counts = repo.journal_counts(db, j.id)
+    journal_dto = repo.journal_to_dto(j, normalized_locale)
     return JournalDetailOut(
-        journal=JournalOut.model_validate(j.__dict__),
+        journal=JournalOut.model_validate(journal_dto),
         counts=JournalCounts(**counts),
     )
 
@@ -50,15 +59,17 @@ def list_journal_issues(
     sort: str = Query("year desc"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    locale: str | None = Query(None, max_length=10),
     db: Session = Depends(get_db),
 ):
     if sort not in {"year desc","year asc","vol asc","vol desc","num asc","num desc"}:
         raise HTTPException(status_code=422, detail="Invalid sort")
-    j = repo.get_journal_by_slug(db, slug)
+    normalized_locale = _normalize_locale(locale)
+    j = repo.get_journal_by_slug(db, slug, normalized_locale)
     if not j:
         raise HTTPException(status_code=404, detail="Journal not found")
-    items, total = repo.list_issues(db, j.id, year, volume, number, sort, page, page_size)
-    payload = [JournalIssueOut.model_validate(i.__dict__) for i in items]
+    items, total = repo.list_issues(db, j.id, year, volume, number, sort, page, page_size, normalized_locale)
+    payload = [JournalIssueOut.model_validate(i) for i in items]
     return PaginatedResponse[JournalIssueOut](items=payload, total=total, page=page, page_size=page_size, has_next=(page*page_size < (total or 0)))
 
 @router.get("/{slug}/articles", response_model=PaginatedResponse[DocumentOut])
@@ -90,3 +101,7 @@ def list_issue_articles(
     docs, total = repo.list_documents_for_issue(db, issue_id, page, page_size)
     payload = [DocumentOut.model_validate(d) for d in docs]
     return PaginatedResponse[DocumentOut](items=payload, total=total, page=page, page_size=page_size, has_next=(page*page_size < (total or 0)))
+
+
+def _normalize_locale(locale: str | None) -> str:
+    return (locale or settings.default_locale).strip().lower()

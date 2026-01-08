@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:3000", "http://127.0.0.1:3000"],
         alias="CORS_ORIGINS",
     )
+    default_locale: str = Field(default="en", alias="DEFAULT_LOCALE")
 
     # storage
     storage_endpoint: str = Field(default="http://127.0.0.1:9000", alias="STORAGE_ENDPOINT")
@@ -44,6 +45,11 @@ class Settings(BaseSettings):
                 # fall back to CSV
                 pass
         return [x.strip() for x in s.split(",") if x.strip()]
+
+    @field_validator("default_locale")
+    @classmethod
+    def normalize_default_locale(cls, v: str) -> str:
+        return (v or "en").strip().lower()
 
 settings = Settings()
 
