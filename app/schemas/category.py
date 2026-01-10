@@ -1,8 +1,23 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.category import CategoryKind
+
+
+class CategoryLocalizedOut(BaseModel):
+    """Category payload with translated fields and ordering metadata."""
+
+    id: int
+    slug: str
+    kind: CategoryKind
+    name: str
+    description: str | None = None
+    parent_id: int | None = None
+    journal_id: int | None = None
+    order_index: int | None = None
+    created_at: datetime | None = None
 
 
 class LinkedJournal(BaseModel):
@@ -68,4 +83,5 @@ __all__ = [
     "CategoryChildrenResponse",
     "CategoryDetailOut",
     "LinkedJournal",
+    "CategoryLocalizedOut",
 ]
