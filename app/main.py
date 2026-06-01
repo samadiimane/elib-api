@@ -8,6 +8,7 @@ from app.api.routes.search import router as search_router
 from app.api.routes.files import router as files_router
 from app.api.routes.journals import router as journals_router
 from app.api.routes.events import router as events_router
+from app.api.routes.ai import router as ai_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.admin import router as admin_router
 from app.api.routes.admin_capabilities import router as admin_capabilities_router
@@ -38,6 +39,7 @@ app.include_router(search_router)
 app.include_router(files_router)
 app.include_router(journals_router)
 app.include_router(events_router)
+app.include_router(ai_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(admin_capabilities_router)

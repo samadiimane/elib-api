@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     auth_secret: str = Field(default="change-me", alias="AUTH_SECRET")
     access_token_exp_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXP_MINUTES")
 
+    # external services
+    rag_api_url: str = Field(default="http://rag-api:8001", alias="RAG_API_URL")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors(cls, v):
