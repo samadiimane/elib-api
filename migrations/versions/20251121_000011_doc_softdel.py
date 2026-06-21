@@ -6,7 +6,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = "20251121_000011_documents_soft_delete"
+revision = "20251121_000011_doc_softdel"
 down_revision = "20251121_000010"
 branch_labels = None
 depends_on = None

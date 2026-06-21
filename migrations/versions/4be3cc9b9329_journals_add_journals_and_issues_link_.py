@@ -65,26 +65,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     bind = op.get_bind()
+
     if bind.dialect.name != "sqlite":
         op.drop_constraint("fk_documents_issue", "documents", type_="foreignkey")
         op.drop_constraint("fk_documents_journal", "documents", type_="foreignkey")
 
-    op.drop_index("ix_documents_issue_id", table_name="documents")
-    op.drop_index("ix_documents_journal_id", table_name="documents")
-    op.drop_column("documents", "end_page")
-    op.drop_column("documents", "start_page")
-    op.drop_column("documents", "issue_id")
-    op.drop_column("documents", "journal_id")
-
-    op.drop_index("ix_journal_issues_year", table_name="journal_issues")
-    op.drop_index("ix_journal_issues_journal_id", table_name="journal_issues")
-    op.drop_table("journal_issues")
-
-    op.drop_index("ix_journals_name", table_name="journals")
-    op.drop_table("journals")
-
-    op.drop_constraint("fk_documents_issue", "documents", type_="foreignkey")
-    op.drop_constraint("fk_documents_journal", "documents", type_="foreignkey")
     op.drop_index("ix_documents_issue_id", table_name="documents")
     op.drop_index("ix_documents_journal_id", table_name="documents")
     op.drop_column("documents", "end_page")

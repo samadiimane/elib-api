@@ -1,7 +1,7 @@
 """Add journal translations table.
 
 Revision ID: 20251230_000012
-Revises: 20251121_000011
+Revises: 20251121_000011_doc_softdel
 Create Date: 2025-12-30 00:00:12.000000
 """
 
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "20251230_000012"
-down_revision: Union[str, Sequence[str], None] = "20251121_000011_documents_soft_delete"
+down_revision: Union[str, Sequence[str], None] = "20251121_000011_doc_softdel"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

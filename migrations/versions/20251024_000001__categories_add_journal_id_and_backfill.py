@@ -52,15 +52,19 @@ def upgrade() -> None:
                 )
         else:
             op.add_column("categories", sa.Column("journal_id", sa.Integer(), nullable=True))
-            op.create_foreign_key(
-                "fk_categories_journal",
-                "categories",
-                "journals",
-                ["journal_id"],
-                ["id"],
-                ondelete="SET NULL",
-                ifnotexists=True,
-            )
+            existing_fks = {
+                fk["name"]
+                for fk in sa.inspect(bind).get_foreign_keys("categories")
+            }
+            if "fk_categories_journal" not in existing_fks:
+                op.create_foreign_key(
+                    "fk_categories_journal",
+                    "categories",
+                    "journals",
+                    ["journal_id"],
+                    ["id"],
+                    ondelete="SET NULL",
+                )
 
     categories_table = sa.Table(
         "categories",
