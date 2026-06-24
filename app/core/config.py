@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     storage_access_key: str = Field(default="minio", alias="STORAGE_ACCESS_KEY")
     storage_secret_key: str = Field(default="minio12345", alias="STORAGE_SECRET_KEY")
     storage_region: str = Field(default="us-east-1", alias="STORAGE_REGION")
+    storage_public_endpoint: str | None = Field(default=None, alias="STORAGE_PUBLIC_ENDPOINT")
     # Optional: if i ever want to build absolute public URLs (we’ll use presigned instead)
     storage_cdn_base: str | None = Field(default=None, alias="STORAGE_CDN_BASE")
 
@@ -53,6 +54,14 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_default_locale(cls, v: str) -> str:
         return (v or "en").strip().lower()
+
+    @field_validator("storage_public_endpoint", "storage_cdn_base", mode="before")
+    @classmethod
+    def blank_to_none(cls, v):
+        if v is None:
+            return None
+        value = str(v).strip()
+        return value or None
 
 settings = Settings()
 
