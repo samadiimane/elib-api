@@ -1,12 +1,3 @@
-"""Seed Dar al-Niaba issue 08 articles.
-
-Usage:
-    python -m scripts.seed_dar_al_niaba_issue_08
-    python -m scripts.seed_dar_al_niaba_issue_08 dar-al-niaba-08-2
-
-The optional arguments are doc ids derived from file_key basenames.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -36,114 +27,6 @@ from app.models import (  # noqa: E402
 configure_mappers()
 
 
-ISSUE = {
-    "journal_slug": "dar-al-niaba",
-    "journal_name": "Dar al-Niaba",
-    "title": "العدد الثامن، السنة الثانية، خريف 1985",
-    "year": 1985,
-    "volume": 2,
-    "number": 8,
-}
-
-
-ARTICLES = [
-    {
-        "title": "افتتاحية",
-        "authors": [],
-        "lang": "ar",
-        "pages": 5,
-        "start_page": 1,
-        "end_page": 4,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-1.pdf",
-    },
-    {
-        "title": "وثائق تنشر لأول مرة حول الحركة الوطنية المغربية مراسلات الأستاذ عبد الله كنون مع قادة الحركة الوطنية المجموعة الثانية",
-        "authors": [],
-        "lang": "ar",
-        "pages": 8,
-        "start_page": 5,
-        "end_page": 12,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-2.pdf",
-    },
-    {
-        "title": "16 وثيقة عن استشارة السلطان الحسن الاول لنخب من مدينة فاس وما اليها في نازلة اقتصادية",
-        "authors": ["محمد المنوني"],
-        "lang": "ar",
-        "pages": 12,
-        "start_page": 13,
-        "end_page": 24,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-3.pdf",
-    },
-    {
-        "title": "وثيقة مغربية جديدة حول زيارة امبراطور ألمانيا غليوم الثاني لطنجة",
-        "authors": ["محمد حجي"],
-        "lang": "ar",
-        "pages": 3,
-        "start_page": 25,
-        "end_page": 27,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-4.pdf",
-    },
-    {
-        "title": "مذكرة الزبير سكيرج (1850-1932) : وثيقة جديدة حول البعثات الطلابية الى أوروبا في عهد المولى الحسن",
-        "authors": ["عبد الغني سكيرج"],
-        "lang": "ar",
-        "pages": 5,
-        "start_page": 28,
-        "end_page": 32,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-5.pdf",
-    },
-    {
-        "title": "من اعلام جبالة : وثائق حول أحمد الحراق",
-        "authors": ["المريني العياشي"],
-        "lang": "ar",
-        "pages": 4,
-        "start_page": 33,
-        "end_page": 36,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-6.pdf",
-    },
-    {
-        "title": "محمد الخامس : عرش وثلاث جمهوريات",
-        "authors": ["جان لاكوتور", "مصطفى بوشعراء"],
-        "lang": "ar",
-        "pages": 11,
-        "start_page": 37,
-        "end_page": 47,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-7.pdf",
-    },
-    {
-        "title": "الإقطاعات العقارية في المغرب مساهمة في دراسة تكوين الممتلكات العقارية في البوادي المغربية",
-        "authors": [
-            "كركوري لازارف",
-            "محمد الأمين البزاز",
-            "عبد العزيز التمسماني خلوق",
-        ],
-        "lang": "ar",
-        "pages": 9,
-        "start_page": 48,
-        "end_page": 56,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-8.pdf",
-    },
-    {
-        "title": "حول الحج المغربي الى الديار المقدسة في القرن التاسع عشر وبداية العشرين",
-        "authors": ["محمد الأمين البزاز"],
-        "lang": "ar",
-        "pages": 9,
-        "start_page": 57,
-        "end_page": 65,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-9.pdf",
-    },
-    {
-        "title": "Un grand nom de la lutte contre la pénétration étrangère au Maroc: MUHAMMAD AL-MA’MUN",
-        "authors": ["Jacques CAGNE"],
-        "lang": "fr",
-        "pages": 3,
-        "start_page": 30,
-        "end_page": 32,
-        "file_key": "dar-al-niaba/pdf/dar-al-niaba-08-11.pdf",
-    },
-]
-
-
 def _set_if_exists(obj: object, attr: str, value: object) -> None:
     if hasattr(obj, attr):
         setattr(obj, attr, value)
@@ -167,23 +50,23 @@ def get_category(session, slug: str, kind: CategoryKind) -> Category | None:
     ).scalars().first()
 
 
-def get_or_create_journal(session) -> Journal:
+def get_or_create_journal(session, issue_config: dict) -> Journal:
     journal = session.execute(
         select(Journal)
-        .where(Journal.slug == ISSUE["journal_slug"])
+        .where(Journal.slug == issue_config["journal_slug"])
         .where(Journal.deleted_at.is_(None))
         .order_by(Journal.id.asc())
     ).scalars().first()
     if journal is not None:
         return journal
 
-    journal = Journal(slug=ISSUE["journal_slug"], name=ISSUE["journal_name"])
+    journal = Journal(slug=issue_config["journal_slug"], name=issue_config["journal_name"])
     session.add(journal)
     session.flush()
     return journal
 
 
-def get_or_create_journal_category(session, journal: Journal) -> Category:
+def get_or_create_journal_category(session, journal: Journal, issue_config: dict) -> Category:
     journals_parent = get_category(session, "journals", CategoryKind.section)
     if journals_parent is None:
         journals_parent = Category(
@@ -203,7 +86,7 @@ def get_or_create_journal_category(session, journal: Journal) -> Category:
             kind=CategoryKind.journal,
             parent=journals_parent,
             journal=journal,
-            order_index=ISSUE["number"],
+            order_index=issue_config["number"],
         )
         session.add(category)
         session.flush()
@@ -216,27 +99,27 @@ def get_or_create_journal_category(session, journal: Journal) -> Category:
     return category
 
 
-def get_or_create_issue(session, journal: Journal) -> JournalIssue:
+def get_or_create_issue(session, journal: Journal, issue_config: dict) -> JournalIssue:
     issue = session.execute(
         select(JournalIssue)
         .where(JournalIssue.journal_id == journal.id)
-        .where(JournalIssue.year == ISSUE["year"])
-        .where(JournalIssue.volume == ISSUE["volume"])
-        .where(JournalIssue.number == ISSUE["number"])
+        .where(JournalIssue.year == issue_config["year"])
+        .where(JournalIssue.volume == issue_config["volume"])
+        .where(JournalIssue.number == issue_config["number"])
     ).scalar_one_or_none()
     if issue is None:
         issue = JournalIssue(
             journal=journal,
-            year=ISSUE["year"],
-            volume=ISSUE["volume"],
-            number=ISSUE["number"],
-            title=ISSUE["title"],
+            year=issue_config["year"],
+            volume=issue_config["volume"],
+            number=issue_config["number"],
+            title=issue_config["title"],
         )
         session.add(issue)
         session.flush()
         return issue
 
-    issue.title = ISSUE["title"]
+    issue.title = issue_config["title"]
     return issue
 
 
@@ -254,6 +137,7 @@ def get_or_create_author(session, full_name_ar: str) -> Author:
     author = session.execute(select(Author).where(Author.slug == slug)).scalar_one_or_none()
     if author is not None:
         _set_if_exists(author, "deleted_at", None)
+        author.full_name_ar = full_name_ar
         return author
 
     author = Author(full_name_ar=full_name_ar, slug=slug)
@@ -285,6 +169,7 @@ def upsert_article(
     journal: Journal,
     issue: JournalIssue,
     category: Category | None,
+    issue_config: dict,
     payload: dict,
 ) -> Document:
     document = session.execute(
@@ -307,7 +192,7 @@ def upsert_article(
     document.abstract = None
     document.type = DocumentType.article
     document.lang = payload["lang"]
-    document.year = ISSUE["year"]
+    document.year = issue_config["year"]
     document.pages = payload["pages"]
     document.file_key = payload["file_key"]
     document.journal = journal
@@ -323,31 +208,38 @@ def upsert_article(
     return document
 
 
-def _selected_articles(doc_ids: Sequence[str]) -> list[dict]:
+def selected_articles(articles: Sequence[dict], doc_ids: Sequence[str]) -> list[dict]:
     if not doc_ids:
-        return ARTICLES
+        return list(articles)
 
-    by_doc_id = {_article_doc_id(article): article for article in ARTICLES}
+    by_doc_id = {_article_doc_id(article): article for article in articles}
     missing = [doc_id for doc_id in doc_ids if doc_id not in by_doc_id]
     if missing:
         raise SystemExit(f"Unknown doc_id(s): {', '.join(missing)}")
     return [by_doc_id[doc_id] for doc_id in doc_ids]
 
 
-def run(doc_ids: Sequence[str] = ()) -> None:
+def run_issue(issue_config: dict, articles_config: Sequence[dict], doc_ids: Sequence[str] = ()) -> None:
     session = SessionLocal()
     try:
-        journal = get_or_create_journal(session)
-        category = get_or_create_journal_category(session, journal)
-        issue = get_or_create_issue(session, journal)
+        journal = get_or_create_journal(session, issue_config)
+        category = get_or_create_journal_category(session, journal, issue_config)
+        issue = get_or_create_issue(session, journal, issue_config)
 
-        articles = _selected_articles(doc_ids)
+        articles = selected_articles(articles_config, doc_ids)
         for article in articles:
-            upsert_article(session, journal=journal, issue=issue, category=category, payload=article)
+            upsert_article(
+                session,
+                journal=journal,
+                issue=issue,
+                category=category,
+                issue_config=issue_config,
+                payload=article,
+            )
 
         session.commit()
         print(
-            f"Seeded Dar al-Niaba issue {ISSUE['number']:02d} "
+            f"Seeded Dar al-Niaba issue {issue_config['number']:02d} "
             f"articles: {len(articles)}"
         )
     except Exception:
@@ -355,7 +247,3 @@ def run(doc_ids: Sequence[str] = ()) -> None:
         raise
     finally:
         session.close()
-
-
-if __name__ == "__main__":
-    run(sys.argv[1:])
