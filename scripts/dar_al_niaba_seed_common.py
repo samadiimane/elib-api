@@ -239,7 +239,7 @@ def run_issue(issue_config: dict, articles_config: Sequence[dict], doc_ids: Sequ
 
         session.commit()
         print(
-            f"Seeded Dar al-Niaba issue {issue_config['number']:02d} "
+            f"Seeded {issue_config['journal_name']} issue {issue_config['number']:02d} "
             f"articles: {len(articles)}"
         )
     except Exception:
